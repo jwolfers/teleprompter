@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:platform.openai.com)",
+      "WebFetch(domain:openai.com)",
+      "WebFetch(domain:deepgram.com)",
+      "WebFetch(domain:soniox.com)",
+      "WebFetch(domain:www.assemblyai.com)",
+      "WebFetch(domain:developers.openai.com)",
+      "WebFetch(domain:community.openai.com)",
+      "WebFetch(domain:techcommunity.microsoft.com)",
+      "Bash(npm create:*)",
+      "WebFetch(domain:medium.com)"
+    ]
+  }
+}
