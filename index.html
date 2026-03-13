@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Teleprompter</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="stylesheet" href="style.css">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#000000">
@@ -14,6 +15,10 @@
         <div class="edit-header">
             <h1>Teleprompter</h1>
             <div class="edit-actions">
+                <button id="btn-demo" title="Load a sample script">Demo Script</button>
+                <button id="btn-save-script" title="Save script to browser">Save</button>
+                <button id="btn-load-script" title="Load a saved script">Load</button>
+                <button id="btn-api-keys" title="Configure API keys">API Keys</button>
                 <button id="btn-clear" title="Clear all text">Clear</button>
                 <button id="btn-start" class="primary">Start Prompter</button>
             </div>
@@ -96,6 +101,19 @@
         <!-- Prompter content area -->
         <div id="prompter-container">
             <div id="prompter-content"></div>
+            <div id="countdown-overlay" class="hidden"></div>
+            <div id="keyboard-hints" class="hidden">
+                <h3>Keyboard Shortcuts</h3>
+                <div class="hint-row"><span class="hint-key"><kbd>Space</kbd></span> <span>Play / Pause</span></div>
+                <div class="hint-row"><span class="hint-key"><kbd>&uarr;</kbd> <kbd>&darr;</kbd></span> <span>Speed +/-</span></div>
+                <div class="hint-row"><span class="hint-key"><kbd>&larr;</kbd> <kbd>&rarr;</kbd></span> <span>Jump back / forward</span></div>
+                <div class="hint-row"><span class="hint-key"><kbd>F</kbd></span> <span>Fullscreen</span></div>
+                <div class="hint-row"><span class="hint-key"><kbd>M</kbd></span> <span>Mirror</span></div>
+                <div class="hint-row"><span class="hint-key"><kbd>R</kbd></span> <span>Reset</span></div>
+                <div class="hint-row"><span class="hint-key"><kbd>?</kbd></span> <span>Toggle this help</span></div>
+                <div class="hint-row"><span class="hint-key"><kbd>Esc</kbd></span> <span>Back to editor</span></div>
+            </div>
+            <div id="progress-bar"><div id="progress-fill"></div></div>
         </div>
 
         <!-- Bottom transport controls -->
@@ -123,6 +141,7 @@
             <div class="transport-spacer"></div>
             <button id="btn-play-pause" class="transport-btn">&#9654; Play</button>
             <button id="btn-reset" class="transport-btn">&#8634; Reset</button>
+            <span id="timer-display"></span>
             <!-- Listen mode status -->
             <div id="listen-status" class="hidden">
                 <span id="listen-indicator"></span>
@@ -132,6 +151,38 @@
         </div>
     </div>
 
+    <!-- API Keys Modal -->
+    <div id="api-keys-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>API Keys</h2>
+            <p class="modal-hint">Keys are stored locally in your browser. Never sent anywhere except the API providers.</p>
+            <label for="input-openai-key">OpenAI API Key <span class="modal-hint">(for Listen mode speech-to-text)</span></label>
+            <input type="password" id="input-openai-key" placeholder="sk-proj-...">
+            <label for="input-anthropic-key">Anthropic API Key <span class="modal-hint">(optional, for LLM fallback matching)</span></label>
+            <input type="password" id="input-anthropic-key" placeholder="sk-ant-...">
+            <div class="modal-actions">
+                <button id="btn-clear-keys">Clear All</button>
+                <button id="btn-save-keys" class="primary">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save/Load Script Modal -->
+    <div id="scripts-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Saved Scripts</h2>
+            <div id="scripts-list" class="script-list">
+                <p style="color: #666; font-size: 13px;">No saved scripts yet.</p>
+            </div>
+            <div class="modal-actions">
+                <button id="btn-close-scripts">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="version-stamp"></div>
+
+    <script src="config.local.js" onerror="window.LOCAL_KEYS={}"></script>
     <script src="config.js"></script>
     <script src="app.js"></script>
 </body>
