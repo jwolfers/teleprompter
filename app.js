@@ -1771,6 +1771,20 @@ document.addEventListener('keydown', (e) => {
             state.scrollPosition += 100;
             prompterContent.style.top = (startPosition - state.scrollPosition) + 'px';
             break;
+        case '.': {
+            // Nudge forward one line
+            const lineH = parseInt(ctrlFontSize.value) * (parseInt(ctrlLineHeight.value) / 100);
+            state.scrollPosition += lineH;
+            prompterContent.style.top = (startPosition - state.scrollPosition) + 'px';
+            break;
+        }
+        case ',': {
+            // Nudge back one line
+            const lineH = parseInt(ctrlFontSize.value) * (parseInt(ctrlLineHeight.value) / 100);
+            state.scrollPosition = Math.max(0, state.scrollPosition - lineH);
+            prompterContent.style.top = (startPosition - state.scrollPosition) + 'px';
+            break;
+        }
         case 'f':
             if (!e.ctrlKey && !e.metaKey) toggleFullscreen();
             break;
