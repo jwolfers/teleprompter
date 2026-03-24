@@ -67,6 +67,7 @@ const ctrlLineHeight = $('#ctrl-line-height');
 const ctrlTextColor = $('#ctrl-text-color');
 const ctrlBgColor = $('#ctrl-bg-color');
 const ctrlSpeed = $('#ctrl-speed');
+const ctrlOpacity = $('#ctrl-opacity');
 const ctrlMode = $('#ctrl-mode');
 const ctrlSpeechEngine = $('#ctrl-speech-engine');
 
@@ -84,6 +85,7 @@ const fontSizeVal = $('#font-size-val');
 const widthVal = $('#width-val');
 const lineHeightVal = $('#line-height-val');
 const speedVal = $('#speed-val');
+const opacityVal = $('#opacity-val');
 
 // Listen mode
 const listenStatus = $('#listen-status');
@@ -403,7 +405,18 @@ function applySettings() {
     prompterContent.style.width = ctrlWidth.value + '%';
     prompterContent.style.lineHeight = (ctrlLineHeight.value / 100).toFixed(1);
     prompterContent.style.color = ctrlTextColor.value;
-    prompterContainer.style.background = ctrlBgColor.value;
+    // Apply background with opacity
+    const opacity = parseInt(ctrlOpacity.value) / 100;
+    const bgHex = ctrlBgColor.value;
+    const r = parseInt(bgHex.slice(1, 3), 16);
+    const g = parseInt(bgHex.slice(3, 5), 16);
+    const b = parseInt(bgHex.slice(5, 7), 16);
+    const bgRgba = `rgba(${r}, ${g}, ${b}, ${opacity})`;
+    prompterContainer.style.background = bgRgba;
+    prompterView.style.background = opacity < 1 ? 'transparent' : bgHex;
+    document.body.style.background = opacity < 1 ? 'transparent' : '';
+    $('#control-bar').style.background = opacity < 1 ? `rgba(17, 17, 17, ${opacity})` : '#111';
+    $('#transport-bar').style.background = opacity < 1 ? `rgba(17, 17, 17, ${opacity})` : '#111';
     state.speed = parseInt(ctrlSpeed.value);
 }
 
@@ -447,6 +460,16 @@ ctrlSpeed.addEventListener('input', () => {
 speedVal.addEventListener('input', () => {
     ctrlSpeed.value = speedVal.value;
     state.speed = parseInt(speedVal.value);
+});
+
+// Opacity: slider <-> spinner sync
+ctrlOpacity.addEventListener('input', () => {
+    opacityVal.value = ctrlOpacity.value;
+    applySettings();
+});
+opacityVal.addEventListener('input', () => {
+    ctrlOpacity.value = opacityVal.value;
+    applySettings();
 });
 
 ctrlTextColor.addEventListener('input', applySettings);
@@ -1756,6 +1779,16 @@ document.addEventListener('keydown', (e) => {
             break;
         case 'r':
             if (!e.ctrlKey && !e.metaKey) resetScroll();
+            break;
+        case '[':
+            ctrlOpacity.value = Math.max(10, parseInt(ctrlOpacity.value) - 10);
+            opacityVal.value = ctrlOpacity.value;
+            applySettings();
+            break;
+        case ']':
+            ctrlOpacity.value = Math.min(100, parseInt(ctrlOpacity.value) + 10);
+            opacityVal.value = ctrlOpacity.value;
+            applySettings();
             break;
         case '?':
             keyboardHints.classList.toggle('hidden');
