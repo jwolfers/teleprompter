@@ -5,7 +5,12 @@
     box-sizing: border-box;
 }
 
-html, body {
+html {
+    height: 100%;
+    background: #1a1a2e;
+}
+
+body {
     height: 100%;
     font-family: 'Segoe UI', Arial, sans-serif;
     background: #1a1a2e;
@@ -138,13 +143,44 @@ button.primary:hover {
 #control-bar {
     display: flex;
     align-items: center;
-    gap: 16px;
-    padding: 8px 16px;
+    padding: 0;
     background: #111;
     border-bottom: 1px solid #333;
-    flex-wrap: wrap;
     z-index: 10;
     transition: opacity 0.3s;
+}
+
+#btn-toggle-controls {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 14px;
+    padding: 6px 10px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: transform 0.2s;
+}
+#btn-toggle-controls:hover {
+    color: #fff;
+}
+#btn-toggle-controls.collapsed {
+    transform: rotate(-90deg);
+}
+
+#control-bar-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 8px;
+    flex-wrap: nowrap;
+    overflow: hidden;
+    transition: max-height 0.3s, opacity 0.3s, padding 0.3s;
+    max-height: 50px;
+}
+#control-bar-controls.collapsed {
+    max-height: 0;
+    opacity: 0;
+    padding: 0 8px;
 }
 
 #control-bar label {
@@ -170,7 +206,7 @@ button.primary:hover {
 }
 
 .control-group input[type="range"] {
-    width: 80px;
+    width: 60px;
     accent-color: #4a6fa5;
 }
 
@@ -697,6 +733,41 @@ button.primary:hover {
 
 .script-item .script-delete:hover {
     color: #e74c3c;
+}
+
+/* Electron-only elements (hidden in browser, shown in Electron) */
+.electron-only {
+    display: none;
+}
+.electron-show {
+    display: inline-block !important;
+    background: #e74c3c;
+    color: #fff;
+    border: none;
+    padding: 4px 10px;
+    font-size: 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-left: auto;
+}
+.electron-show:hover {
+    background: #c0392b;
+}
+
+/* Electron frameless window drag regions */
+.edit-header, #control-bar, #drag-bar {
+    -webkit-app-region: drag;
+}
+
+#drag-bar {
+    display: none;
+    height: 8px;
+    width: 100%;
+    cursor: move;
+}
+.edit-header button, .edit-header select, .edit-header input,
+#control-bar button, #control-bar select, #control-bar input {
+    -webkit-app-region: no-drag;
 }
 
 /* Version stamp */

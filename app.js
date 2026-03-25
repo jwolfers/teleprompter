@@ -80,6 +80,18 @@ const btnFullscreen = $('#btn-fullscreen');
 const btnMirror = $('#btn-mirror');
 const btnClear = $('#btn-clear');
 
+// Electron close buttons
+const isElectron = navigator.userAgent.includes('Electron');
+if (isElectron) {
+    document.querySelectorAll('.electron-only').forEach(el => {
+        el.classList.remove('electron-only');
+        el.classList.add('electron-show');
+    });
+    const closeWindow = () => window.close();
+    $('#btn-close-edit').addEventListener('click', closeWindow);
+    $('#btn-close-prompter').addEventListener('click', closeWindow);
+}
+
 // Spinner inputs (number inputs next to sliders)
 const fontSizeVal = $('#font-size-val');
 const widthVal = $('#width-val');
@@ -414,6 +426,7 @@ function applySettings() {
     const bgRgba = `rgba(${r}, ${g}, ${b}, ${opacity})`;
     prompterContainer.style.background = bgRgba;
     prompterView.style.background = opacity < 1 ? 'transparent' : bgHex;
+    document.documentElement.style.background = opacity < 1 ? 'transparent' : '';
     document.body.style.background = opacity < 1 ? 'transparent' : '';
     $('#control-bar').style.background = opacity < 1 ? `rgba(17, 17, 17, ${opacity})` : '#111';
     $('#transport-bar').style.background = opacity < 1 ? `rgba(17, 17, 17, ${opacity})` : '#111';
@@ -1825,6 +1838,14 @@ btnBack.addEventListener('click', backToEditor);
 btnPlayPause.addEventListener('click', togglePlayPause);
 btnReset.addEventListener('click', resetScroll);
 btnFullscreen.addEventListener('click', toggleFullscreen);
+
+// Toggle controls visibility
+const btnToggleControls = $('#btn-toggle-controls');
+const controlBarControls = $('#control-bar-controls');
+btnToggleControls.addEventListener('click', () => {
+    btnToggleControls.classList.toggle('collapsed');
+    controlBarControls.classList.toggle('collapsed');
+});
 btnMirror.addEventListener('click', toggleMirror);
 btnClear.addEventListener('click', () => {
     editor.innerHTML = '<p><br></p>';
