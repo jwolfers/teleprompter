@@ -49,6 +49,11 @@ const state = {
 
     // Remote control
     broadcastChannel: null,
+
+    // Google Doc sync
+    googleDocId: null,        // Currently linked Google Doc ID
+    gdocPollInterval: null,   // Auto-refresh interval
+    gdocLastHtml: '',         // Last fetched content for change detection
 };
 
 // ===== DOM REFS =====
@@ -1676,6 +1681,242 @@ function showLoadScripts() {
     }
     modal.classList.remove('hidden');
 }
+
+
+// ===== GOOGLE DOC IMPORT =====
+
+function extractGoogleDocId(url) {
+    // Match /document/d/XXXXX or /document/d/XXXXX/
+    const match = url.match(/\/document\/d\/([a-zA-Z0-9_-]+)/);
+    return match ? match[1] : null;
+}
+
+function cleanGoogleDocHtml(rawHtml) {
+    // Parse the HTML and extract the body content
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(rawHtml, 'text/html');
+    const body = doc.body;
+    if (!body) return '';
+
+    // Remove Google's style tags and metadata
+    body.querySelectorAll('style, script, meta, link').forEach(el => el.remove());
+
+    // Convert Google's span-based formatting to semantic HTML
+    // Google Docs uses inline styles for bold/italic rather than <b>/<i>/<em>
+    body.querySelectorAll('span').forEach(span => {
+        const style = span.style;
+        const isBold = style.fontWeight === '700' || style.fontWeight === 'bold';
+        const isItalic = style.fontStyle === 'italic';
+
+        if (isItalic && isBold) {
+            span.outerHTML = `<strong><em>${span.innerHTML}</em></strong>`;
+        } else if (isItalic) {
+            span.outerHTML = `<em>${span.innerHTML}</em>`;
+        } else if (isBold) {
+            span.outerHTML = `<strong>${span.innerHTML}</strong>`;
+        } else {
+            // Unwrap plain spans — keep their text content
+            span.outerHTML = span.innerHTML;
+        }
+    });
+
+    // Collect paragraphs
+    const paragraphs = [];
+    body.querySelectorAll('p').forEach(p => {
+        const text = p.textContent.trim();
+        if (text) {
+            paragraphs.push(`<p>${p.innerHTML.trim()}</p>`);
+        }
+    });
+
+    return paragraphs.join('\n');
+}
+
+async function fetchGoogleDocHtml(docId) {
+    const exportUrl = `https://docs.google.com/document/d/${docId}/export?format=html`;
+
+    let response;
+    try {
+        // In Electron, CORS isn't an issue; in browser, Google may block cross-origin
+        response = await fetch(exportUrl);
+    } catch (e) {
+        // Fallback: try via a CORS proxy
+        response = await fetch(`https://corsproxy.io/?url=${encodeURIComponent(exportUrl)}`);
+    }
+
+    if (!response.ok) {
+        if (response.status === 404) {
+            throw new Error('Document not found. Check the URL is correct.');
+        } else if (response.status === 401 || response.status === 403) {
+            throw new Error('Access denied. Make sure the doc is shared as "Anyone with the link can view".');
+        }
+        throw new Error(`Failed to fetch document (HTTP ${response.status}).`);
+    }
+
+    const rawHtml = await response.text();
+    return cleanGoogleDocHtml(rawHtml);
+}
+
+// Apply a Google Doc update to the editor and (if active) prompter view
+function applyGoogleDocContent(html) {
+    // Skip if content hasn't changed
+    if (html === state.gdocLastHtml) return false;
+    state.gdocLastHtml = html;
+
+    editor.innerHTML = html;
+    state.editedScript = html;
+    state.originalScript = html;
+    adjustEditorBackground();
+
+    // If prompter is currently showing, update it in-place preserving scroll position
+    if (!prompterView.classList.contains('hidden')) {
+        prompterContent.innerHTML = processContentForDisplay(html);
+        state.paragraphs = parseParagraphs();
+        // Rebuild script index for listen mode if active
+        if (state.mode === 'listen') {
+            buildScriptIndex();
+        }
+    }
+    return true;
+}
+
+function startGdocPolling() {
+    stopGdocPolling();
+    // Poll every 10 seconds
+    state.gdocPollInterval = setInterval(async () => {
+        if (!state.googleDocId) return;
+        try {
+            const html = await fetchGoogleDocHtml(state.googleDocId);
+            if (html && applyGoogleDocContent(html)) {
+                flashGdocSyncIndicator();
+            }
+        } catch (e) {
+            // Silent fail on background poll — doc may have gone private, network blip, etc.
+            console.warn('[Google Doc sync] poll failed:', e.message);
+        }
+    }, 10000);
+}
+
+function stopGdocPolling() {
+    if (state.gdocPollInterval) {
+        clearInterval(state.gdocPollInterval);
+        state.gdocPollInterval = null;
+    }
+}
+
+function linkGoogleDoc(docId, html) {
+    state.googleDocId = docId;
+    state.gdocLastHtml = html;
+    updateGdocLinkUI();
+    startGdocPolling();
+}
+
+function unlinkGoogleDoc() {
+    stopGdocPolling();
+    state.googleDocId = null;
+    state.gdocLastHtml = '';
+    updateGdocLinkUI();
+}
+
+// Show/hide the linked-doc badge next to the Google Doc button
+function updateGdocLinkUI() {
+    const badge = $('#gdoc-linked-badge');
+    if (state.googleDocId) {
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
+    }
+}
+
+// Brief flash on the badge when an auto-sync updates content
+function flashGdocSyncIndicator() {
+    const badge = $('#gdoc-linked-badge');
+    badge.classList.add('gdoc-synced');
+    setTimeout(() => badge.classList.remove('gdoc-synced'), 1500);
+}
+
+// Manual refresh
+async function refreshGoogleDoc() {
+    if (!state.googleDocId) return;
+    const badge = $('#gdoc-linked-badge');
+    badge.textContent = '⟳ Syncing…';
+    try {
+        const html = await fetchGoogleDocHtml(state.googleDocId);
+        if (html) applyGoogleDocContent(html);
+        badge.textContent = '🔗 Linked';
+    } catch (err) {
+        badge.textContent = '⚠ Sync failed';
+        setTimeout(() => { badge.textContent = '🔗 Linked'; }, 3000);
+    }
+}
+
+// Wire up Google Doc modal
+const gdocModal = $('#gdoc-modal');
+const gdocUrlInput = $('#input-gdoc-url');
+const gdocStatus = $('#gdoc-status');
+
+$('#btn-gdoc').addEventListener('click', () => {
+    gdocUrlInput.value = '';
+    gdocStatus.textContent = '';
+    gdocModal.classList.remove('hidden');
+    gdocUrlInput.focus();
+});
+
+$('#btn-gdoc-cancel').addEventListener('click', () => {
+    gdocModal.classList.add('hidden');
+});
+
+gdocModal.addEventListener('click', (e) => {
+    if (e.target === gdocModal) gdocModal.classList.add('hidden');
+});
+
+$('#btn-gdoc-import').addEventListener('click', async () => {
+    const url = gdocUrlInput.value.trim();
+    if (!url) {
+        gdocStatus.textContent = 'Please paste a Google Doc URL.';
+        return;
+    }
+
+    const docId = extractGoogleDocId(url);
+    if (!docId) {
+        gdocStatus.textContent = 'Could not find a Google Doc ID in that URL.';
+        return;
+    }
+
+    gdocStatus.textContent = 'Importing…';
+    $('#btn-gdoc-import').disabled = true;
+
+    try {
+        const html = await fetchGoogleDocHtml(docId);
+        if (!html) {
+            throw new Error('The document appears to be empty.');
+        }
+        applyGoogleDocContent(html);
+        linkGoogleDoc(docId, html);
+        gdocModal.classList.add('hidden');
+    } catch (err) {
+        gdocStatus.textContent = err.message;
+    } finally {
+        $('#btn-gdoc-import').disabled = false;
+    }
+});
+
+// Allow Enter key to trigger import
+gdocUrlInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        $('#btn-gdoc-import').click();
+    }
+});
+
+// Linked badge: click to refresh, right-click to unlink
+$('#gdoc-linked-badge').addEventListener('click', refreshGoogleDoc);
+$('#gdoc-linked-badge').addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    if (confirm('Unlink this Google Doc? (Auto-sync will stop)')) {
+        unlinkGoogleDoc();
+    }
+});
 
 
 // ===== TOUCH SUPPORT =====

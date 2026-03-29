@@ -17,6 +17,8 @@
             <h1>Teleprompter</h1>
             <div class="edit-actions">
                 <button id="btn-demo" title="Load a sample script">Demo Script</button>
+                <button id="btn-gdoc" title="Import from Google Docs">Google Doc</button>
+                <span id="gdoc-linked-badge" class="gdoc-badge hidden" title="Click to refresh · Right-click to unlink">🔗 Linked</span>
                 <button id="btn-save-script" title="Save script to browser">Save</button>
                 <button id="btn-load-script" title="Load a saved script">Load</button>
                 <button id="btn-api-keys" title="Configure API keys">API Keys</button>
@@ -190,6 +192,21 @@
             </div>
             <div class="modal-actions">
                 <button id="btn-close-scripts">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Google Doc Import Modal -->
+    <div id="gdoc-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Import from Google Docs</h2>
+            <p class="modal-hint">Paste the URL of a Google Doc. The doc must be shared as "Anyone with the link can view".</p>
+            <label for="input-gdoc-url">Google Doc URL</label>
+            <input type="text" id="input-gdoc-url" placeholder="https://docs.google.com/document/d/...">
+            <div id="gdoc-status" class="modal-hint" style="min-height:1.2em;"></div>
+            <div class="modal-actions">
+                <button id="btn-gdoc-cancel">Cancel</button>
+                <button id="btn-gdoc-import" class="primary">Import</button>
             </div>
         </div>
     </div>

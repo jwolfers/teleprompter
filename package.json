@@ -3,9 +3,40 @@
     "version": "1.0.0",
     "main": "main.js",
     "scripts": {
-        "start": "electron ."
+        "start": "electron .",
+        "build:win": "electron-builder --win portable",
+        "build:mac": "electron-builder --mac",
+        "build": "electron-builder --win portable --mac"
+    },
+    "build": {
+        "appId": "com.platypustools.teleprompter",
+        "productName": "Teleprompter",
+        "files": [
+            "main.js",
+            "index.html",
+            "app.js",
+            "style.css",
+            "config.js",
+            "config.example.js",
+            "manifest.json",
+            "icon-192.png",
+            "icon-512.png"
+        ],
+        "win": {
+            "target": "portable"
+        },
+        "mac": {
+            "target": "dmg"
+        },
+        "portable": {
+            "artifactName": "Teleprompter.exe"
+        },
+        "dmg": {
+            "artifactName": "Teleprompter.dmg"
+        }
     },
     "devDependencies": {
-        "electron": "^35.0.0"
+        "electron": "^35.0.0",
+        "electron-builder": "^26.0.0"
     }
 }
