@@ -4,6 +4,7 @@
     "main": "main.js",
     "scripts": {
         "start": "electron .",
+        "icons": "electron tools/make-icons.js",
         "build:win": "electron-builder --win portable",
         "build:mac": "electron-builder --mac",
         "build": "electron-builder --win portable --mac"
@@ -16,14 +17,16 @@
             "index.html",
             "app.js",
             "style.css",
-            "config.js",
-            "config.example.js",
             "manifest.json",
+            "favicon.svg",
+            "icon.ico",
             "icon-192.png",
             "icon-512.png"
         ],
         "win": {
-            "target": "portable"
+            "target": "portable",
+            "icon": "icon.ico",
+            "signAndEditExecutable": false
         },
         "mac": {
             "target": "dmg"

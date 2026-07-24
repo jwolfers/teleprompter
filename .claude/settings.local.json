@@ -10,7 +10,11 @@
       "WebFetch(domain:community.openai.com)",
       "WebFetch(domain:techcommunity.microsoft.com)",
       "Bash(npm create:*)",
-      "WebFetch(domain:medium.com)"
+      "WebFetch(domain:medium.com)",
+      "Bash(find 'D:\\\\University of Michigan Dropbox\\\\Justin Wolfers\\\\Justin@ActTwo\\\\Coding\\\\platypus-tools' -type d -name *download* -o -type d -name *release* -o -type d -name *dist*)",
+      "Bash(npm run:*)",
+      "Bash(CSC_IDENTITY_AUTO_DISCOVERY=false npm run build:win)",
+      "Bash(gh release:*)"
     ]
   }
 }

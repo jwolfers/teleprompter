@@ -21,7 +21,10 @@
                 <span id="gdoc-linked-badge" class="gdoc-badge hidden" title="Click to refresh · Right-click to unlink">🔗 Linked</span>
                 <button id="btn-save-script" title="Save script to browser">Save</button>
                 <button id="btn-load-script" title="Load a saved script">Load</button>
-                <button id="btn-api-keys" title="Configure API keys">API Keys</button>
+                <label class="clean-paras-toggle" title="Automatically remove empty paragraphs from pasted or imported scripts">
+                    <input type="checkbox" id="ctrl-clean-paras" checked>
+                    Clear extra &para; marks
+                </label>
                 <button id="btn-clear" title="Clear all text">Clear</button>
                 <button id="btn-start" class="primary">Start Prompter</button>
                 <button id="btn-close-edit" class="electron-only" title="Close window">&#x2715;</button>
@@ -39,9 +42,29 @@
 
     <!-- PROMPTER VIEW: The teleprompter display -->
     <div id="prompter-view" class="hidden">
-        <!-- Control bar at top -->
+        <!-- Prompter content area -->
+        <div id="prompter-container">
+            <div id="prompter-content"></div>
+            <div id="countdown-overlay" class="hidden"></div>
+            <div id="keyboard-hints" class="hidden">
+                <h3>Keyboard Shortcuts</h3>
+                <div class="hint-row"><span class="hint-key"><kbd>Space</kbd></span> <span>Play / Pause</span></div>
+                <div class="hint-row"><span class="hint-key"><kbd>&uarr;</kbd> <kbd>&darr;</kbd></span> <span>Speed +/-</span></div>
+                <div class="hint-row"><span class="hint-key"><kbd>&larr;</kbd> <kbd>&rarr;</kbd></span> <span>Jump back / forward</span></div>
+                <div class="hint-row"><span class="hint-key"><kbd>F</kbd></span> <span>Fullscreen</span></div>
+                <div class="hint-row"><span class="hint-key"><kbd>M</kbd></span> <span>Mirror</span></div>
+                <div class="hint-row"><span class="hint-key"><kbd>R</kbd></span> <span>Reset</span></div>
+                <div class="hint-row"><span class="hint-key"><kbd>,</kbd> <kbd>.</kbd></span> <span>Nudge back/forward one line</span></div>
+                <div class="hint-row"><span class="hint-key"><kbd>[</kbd> <kbd>]</kbd></span> <span>Opacity -/+</span></div>
+                <div class="hint-row"><span class="hint-key"><kbd>?</kbd></span> <span>Toggle this help</span></div>
+                <div class="hint-row"><span class="hint-key"><kbd>Esc</kbd></span> <span>Back to editor</span></div>
+            </div>
+            <div id="progress-bar"><div id="progress-fill"></div></div>
+        </div>
+
+        <!-- Settings bar (font, size, colors, etc.) — wraps when window is narrow -->
         <div id="control-bar">
-            <button id="btn-toggle-controls" title="Show/hide controls">&#x25BC;</button>
+            <button id="btn-toggle-controls" title="Show/hide controls">&#x25B2;</button>
             <div id="control-bar-controls">
                 <div class="control-group">
                     <button id="btn-back" title="Back to editor">&#9664; Edit</button>
@@ -112,74 +135,12 @@
             </div>
         </div>
 
-        <!-- Prompter content area -->
-        <div id="prompter-container">
-            <div id="prompter-content"></div>
-            <div id="countdown-overlay" class="hidden"></div>
-            <div id="keyboard-hints" class="hidden">
-                <h3>Keyboard Shortcuts</h3>
-                <div class="hint-row"><span class="hint-key"><kbd>Space</kbd></span> <span>Play / Pause</span></div>
-                <div class="hint-row"><span class="hint-key"><kbd>&uarr;</kbd> <kbd>&darr;</kbd></span> <span>Speed +/-</span></div>
-                <div class="hint-row"><span class="hint-key"><kbd>&larr;</kbd> <kbd>&rarr;</kbd></span> <span>Jump back / forward</span></div>
-                <div class="hint-row"><span class="hint-key"><kbd>F</kbd></span> <span>Fullscreen</span></div>
-                <div class="hint-row"><span class="hint-key"><kbd>M</kbd></span> <span>Mirror</span></div>
-                <div class="hint-row"><span class="hint-key"><kbd>R</kbd></span> <span>Reset</span></div>
-                <div class="hint-row"><span class="hint-key"><kbd>,</kbd> <kbd>.</kbd></span> <span>Nudge back/forward one line</span></div>
-                <div class="hint-row"><span class="hint-key"><kbd>[</kbd> <kbd>]</kbd></span> <span>Opacity -/+</span></div>
-                <div class="hint-row"><span class="hint-key"><kbd>?</kbd></span> <span>Toggle this help</span></div>
-                <div class="hint-row"><span class="hint-key"><kbd>Esc</kbd></span> <span>Back to editor</span></div>
-            </div>
-            <div id="progress-bar"><div id="progress-fill"></div></div>
-        </div>
-
         <!-- Bottom transport controls -->
         <div id="transport-bar">
-            <div class="control-group">
-                <div class="mode-toggle-group">
-                    <span class="mode-label" id="mode-scroll-label">Scroll</span>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="ctrl-mode">
-                        <span class="toggle-slider"></span>
-                    </label>
-                    <span class="mode-label" id="mode-listen-label">Listen</span>
-                </div>
-            </div>
-
-            <div class="control-group listen-option hidden" id="speech-engine-group">
-                <label>Engine</label>
-                <select id="ctrl-speech-engine">
-                    <option value="webspeech">Web Speech API (Free)</option>
-                    <option value="openai" selected>OpenAI GPT-4o-mini ($0.003/min)</option>
-                    <option value="openai-full">OpenAI GPT-4o ($0.006/min)</option>
-                </select>
-            </div>
-
             <div class="transport-spacer"></div>
             <button id="btn-play-pause" class="transport-btn">&#9654; Play</button>
             <button id="btn-reset" class="transport-btn">&#8634; Reset</button>
             <span id="timer-display"></span>
-            <!-- Listen mode status -->
-            <div id="listen-status" class="hidden">
-                <span id="listen-indicator"></span>
-                <span id="listen-text">Listening...</span>
-                <span id="listen-cost" title="Estimated session cost">$0.00</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- API Keys Modal -->
-    <div id="api-keys-modal" class="modal hidden">
-        <div class="modal-content">
-            <h2>API Keys</h2>
-            <p class="modal-hint">Keys are stored locally in your browser. Never sent anywhere except the API providers.</p>
-            <label for="input-openai-key">OpenAI API Key <span class="modal-hint">(for Listen mode speech-to-text)</span></label>
-            <input type="password" id="input-openai-key" placeholder="sk-proj-...">
-            <label for="input-anthropic-key">Anthropic API Key <span class="modal-hint">(optional, for LLM fallback matching)</span></label>
-            <input type="password" id="input-anthropic-key" placeholder="sk-ant-...">
-            <div class="modal-actions">
-                <button id="btn-clear-keys">Clear All</button>
-                <button id="btn-save-keys" class="primary">Save</button>
-            </div>
         </div>
     </div>
 
@@ -213,8 +174,6 @@
 
     <div id="version-stamp"></div>
 
-    <script src="config.local.js" onerror="window.LOCAL_KEYS={}"></script>
-    <script src="config.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
