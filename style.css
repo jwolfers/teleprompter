@@ -96,6 +96,14 @@ button.full-width {
     transform: translateX(-50%) scaleX(-1);
 }
 
+/* Images (e.g. charts from Google Docs) scale to fit the prompter column */
+#prompter-content img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 0.5em auto;
+}
+
 /* Dim bracketed text */
 #prompter-content .stage-direction {
     color: #555;

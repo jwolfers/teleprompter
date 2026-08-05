@@ -143,6 +143,12 @@ function cleanGoogleDocsHtml(html) {
         }
     });
 
+    // Let the prompter's own CSS size images (charts paste with fixed pixel dimensions)
+    body.querySelectorAll('img').forEach(img => {
+        img.removeAttribute('width');
+        img.removeAttribute('height');
+    });
+
     return body.innerHTML;
 }
 
@@ -574,11 +580,18 @@ function cleanGoogleDocHtml(rawHtml) {
         }
     });
 
-    // Collect paragraphs
+    // Let the prompter's own CSS size images (charts export with fixed pixel dimensions)
+    body.querySelectorAll('img').forEach(img => {
+        img.removeAttribute('style');
+        img.removeAttribute('width');
+        img.removeAttribute('height');
+    });
+
+    // Collect paragraphs (keep image-only ones — charts have no text)
     const paragraphs = [];
     body.querySelectorAll('p').forEach(p => {
         const text = p.textContent.trim();
-        if (text) {
+        if (text || p.querySelector('img')) {
             paragraphs.push(`<p>${p.innerHTML.trim()}</p>`);
         }
     });
