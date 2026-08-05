@@ -4,6 +4,7 @@ const state = {
     speed: 30,              // pixels per second
     scrollPosition: 0,
     mirrored: false,
+    panelWidth: 232,        // side panel width in px
     animationFrame: null,
     lastTimestamp: null,
 
@@ -292,14 +293,15 @@ function applySettings() {
     const barBg = `rgba(17, 17, 17, ${opacity})`;
     sidePanel.style.background = barBg;
     $('#bottom-bar').style.background = barBg;
+    document.documentElement.style.setProperty('--panel-bg', barBg);
 
     state.speed = parseInt(ctrlSpeed.value);
 
     // Update value labels next to the sliders
-    fontSizeVal.textContent = ctrlFontSize.value;
-    widthVal.textContent = ctrlWidth.value;
-    lineHeightVal.textContent = (ctrlLineHeight.value / 100).toFixed(1);
-    speedVal.textContent = ctrlSpeed.value;
+    fontSizeVal.textContent = ctrlFontSize.value + 'px';
+    widthVal.textContent = ctrlWidth.value + '%';
+    lineHeightVal.textContent = (ctrlLineHeight.value / 100).toFixed(1) + '×';
+    speedVal.textContent = ctrlSpeed.value + ' px/s';
     opacityVal.textContent = ctrlOpacity.value + '%';
 
     saveSettings();
@@ -319,7 +321,9 @@ function saveSettings() {
         bgColor: ctrlBgColor.value,
         speed: ctrlSpeed.value,
         opacity: ctrlOpacity.value,
-        mirrored: state.mirrored
+        mirrored: state.mirrored,
+        panelWidth: state.panelWidth,
+        panelCollapsed: sidePanel.classList.contains('collapsed')
     }));
 }
 
@@ -340,6 +344,11 @@ function loadSettings() {
     if (saved.speed) ctrlSpeed.value = saved.speed;
     if (saved.opacity) ctrlOpacity.value = saved.opacity;
     if (saved.mirrored) toggleMirror();
+    if (saved.panelWidth) {
+        state.panelWidth = saved.panelWidth;
+        sidePanel.style.width = state.panelWidth + 'px';
+    }
+    setPanelCollapsed(!!saved.panelCollapsed);
     applySettings();
 }
 
@@ -1054,20 +1063,39 @@ btnClear.addEventListener('click', () => {
     prompterContent.focus();
 });
 
-// Gear button shows/hides the right panel
-$('#btn-toggle-settings').addEventListener('click', () => {
-    sidePanel.classList.toggle('collapsed');
+// Chevron button shows/hides the right panel
+const btnToggleSettings = $('#btn-toggle-settings');
+
+function setPanelCollapsed(collapsed) {
+    sidePanel.classList.toggle('collapsed', collapsed);
+    $('#panel-resizer').classList.toggle('collapsed', collapsed);
+    btnToggleSettings.innerHTML = collapsed ? '&laquo;' : '&raquo;';
+    btnToggleSettings.title = collapsed ? 'Show panel' : 'Hide panel';
+}
+
+btnToggleSettings.addEventListener('click', () => {
+    setPanelCollapsed(!sidePanel.classList.contains('collapsed'));
+    saveSettings();
 });
 
-// Tabs in the right panel
-document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        document.querySelectorAll('.tab-btn').forEach(b =>
-            b.classList.toggle('active', b === btn));
-        document.querySelectorAll('.tab-page').forEach(p =>
-            p.classList.add('hidden'));
-        $('#tab-' + btn.dataset.tab).classList.remove('hidden');
-    });
+// Drag the panel's left edge to resize it
+$('#panel-resizer').addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = sidePanel.offsetWidth;
+    const onMove = (ev) => {
+        state.panelWidth = Math.min(500, Math.max(170, startWidth + (startX - ev.clientX)));
+        sidePanel.style.width = state.panelWidth + 'px';
+    };
+    const onUp = () => {
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+        document.body.classList.remove('resizing-panel');
+        saveSettings();
+    };
+    document.body.classList.add('resizing-panel');
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
 });
 
 

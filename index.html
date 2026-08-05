@@ -12,7 +12,7 @@
 <body>
     <div id="drag-bar" class="electron-only"></div>
     <button id="btn-close-app" class="electron-only" title="Close">&#x2715;</button>
-    <button id="btn-toggle-settings" title="Show/hide panel">&#x2699;</button>
+    <button id="btn-toggle-settings" title="Hide panel">&raquo;</button>
 
     <!-- One screen: the prompter is also the editor (paste and edit right in it) -->
     <div id="main">
@@ -36,78 +36,70 @@
             <div id="progress-bar"><div id="progress-fill"></div></div>
         </div>
 
-        <!-- Right panel: Script (load/import) and Display (appearance) tabs -->
+        <!-- Right panel: script loading and display settings, all always visible -->
+        <div id="panel-resizer" title="Drag to resize"></div>
         <div id="side-panel">
-            <div id="panel-tabs">
-                <button class="tab-btn active" data-tab="script">Script</button>
-                <button class="tab-btn" data-tab="display">Display</button>
+            <button id="btn-gdoc" class="full-width" title="Import a Google Doc and keep the prompter in sync with it as you edit the doc">Import Google Doc</button>
+            <span id="gdoc-linked-badge" class="gdoc-badge hidden" title="Click to refresh · Right-click to unlink">🔗 Linked</span>
+            <button id="btn-demo" class="full-width" title="Load a sample script">Demo Script</button>
+            <button id="btn-clear" class="full-width" title="Clear all text">Clear</button>
+            <p class="side-hint">
+                Or paste your script straight into the prompter. Extra blank paragraphs
+                are removed automatically. You can edit the text any time it's paused.
+                <em>Italics</em> = riff sections.
+                [Bracketed text] = stage directions (not spoken).
+            </p>
+
+            <hr class="panel-divider">
+
+            <div class="setting">
+                <label>Font</label>
+                <select id="ctrl-font">
+                    <option value="Arial, sans-serif">Arial</option>
+                    <option value="'Times New Roman', serif">Times New Roman</option>
+                    <option value="'Courier New', monospace">Courier New</option>
+                    <option value="Georgia, serif">Georgia</option>
+                    <option value="Verdana, sans-serif">Verdana</option>
+                    <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+                    <option value="Palatino, serif">Palatino</option>
+                    <option value="'Segoe UI', sans-serif">Segoe UI</option>
+                </select>
             </div>
 
-            <div id="tab-script" class="tab-page">
-                <button id="btn-gdoc" class="full-width" title="Import from Google Docs">Import Google Doc</button>
-                <span id="gdoc-linked-badge" class="gdoc-badge hidden" title="Click to refresh · Right-click to unlink">🔗 Linked</span>
-                <button id="btn-demo" class="full-width" title="Load a sample script">Demo Script</button>
-                <button id="btn-clear" class="full-width" title="Clear all text">Clear</button>
-                <p class="side-hint">
-                    Or paste your script straight into the prompter. Extra blank paragraphs
-                    are removed automatically. You can edit the text any time it's paused.
-                </p>
-                <p class="side-hint">
-                    <em>Italics</em> = riff sections.<br>
-                    [Bracketed text] = stage directions (not spoken).
-                </p>
+            <div class="setting">
+                <label>Size <span id="font-size-val">40px</span></label>
+                <input type="range" id="ctrl-font-size" min="8" max="96" value="40">
             </div>
 
-            <div id="tab-display" class="tab-page hidden">
-                <div class="setting">
-                    <label>Font</label>
-                    <select id="ctrl-font">
-                        <option value="Arial, sans-serif">Arial</option>
-                        <option value="'Times New Roman', serif">Times New Roman</option>
-                        <option value="'Courier New', monospace">Courier New</option>
-                        <option value="Georgia, serif">Georgia</option>
-                        <option value="Verdana, sans-serif">Verdana</option>
-                        <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
-                        <option value="Palatino, serif">Palatino</option>
-                        <option value="'Segoe UI', sans-serif">Segoe UI</option>
-                    </select>
-                </div>
+            <div class="setting">
+                <label>Spacing <span id="line-height-val">1.6&times;</span></label>
+                <input type="range" id="ctrl-line-height" min="100" max="300" value="160">
+            </div>
 
-                <div class="setting">
-                    <label>Size <span id="font-size-val">40</span></label>
-                    <input type="range" id="ctrl-font-size" min="8" max="96" value="40">
-                </div>
+            <div class="setting">
+                <label>Width <span id="width-val">70%</span></label>
+                <input type="range" id="ctrl-width" min="30" max="100" value="70">
+            </div>
 
-                <div class="setting">
-                    <label>Spacing <span id="line-height-val">1.6</span></label>
-                    <input type="range" id="ctrl-line-height" min="100" max="300" value="160">
-                </div>
+            <div class="setting">
+                <label>Speed <span id="speed-val">30 px/s</span></label>
+                <input type="range" id="ctrl-speed" min="0" max="100" value="30">
+            </div>
 
-                <div class="setting">
-                    <label>Width <span id="width-val">70</span></label>
-                    <input type="range" id="ctrl-width" min="30" max="100" value="70">
+            <div class="setting setting-colors">
+                <div class="color-item">
+                    <label>Text</label>
+                    <input type="color" id="ctrl-text-color" value="#ffffff">
                 </div>
+                <div class="color-item">
+                    <label>Background</label>
+                    <input type="color" id="ctrl-bg-color" value="#000000">
+                </div>
+            </div>
 
-                <div class="setting">
-                    <label>Speed <span id="speed-val">30</span></label>
-                    <input type="range" id="ctrl-speed" min="0" max="100" value="30">
-                </div>
-
-                <div class="setting setting-colors">
-                    <div class="color-item">
-                        <label>Text</label>
-                        <input type="color" id="ctrl-text-color" value="#ffffff">
-                    </div>
-                    <div class="color-item">
-                        <label>Background</label>
-                        <input type="color" id="ctrl-bg-color" value="#000000">
-                    </div>
-                </div>
-
-                <div class="setting setting-buttons">
-                    <button id="btn-mirror" title="Mirror/flip text horizontally">Mirror</button>
-                    <button id="btn-fullscreen" title="Toggle fullscreen">Fullscreen</button>
-                </div>
+            <div class="setting setting-buttons">
+                <button id="btn-mirror" title="Mirror/flip text horizontally">Mirror</button>
+                <button id="btn-fullscreen" title="Toggle fullscreen">Fullscreen</button>
             </div>
         </div>
     </div>
@@ -146,7 +138,7 @@
                 <li><strong>Get your script in.</strong> Paste it straight into the big black area, or use <em>Import Google Doc</em> in the side panel (it stays synced as you edit the doc).</li>
                 <li><strong>Press <kbd>Space</kbd> (or Play) to start scrolling.</strong> A 3-2-1 countdown runs, then read the line at the blue guide line.</li>
                 <li><strong>Adjust on the fly.</strong> <kbd>&uarr;</kbd>/<kbd>&darr;</kbd> change speed, <kbd>&larr;</kbd>/<kbd>&rarr;</kbd> jump back or forward, and the mouse wheel scrubs anywhere.</li>
-                <li><strong>Make it yours.</strong> The &#x2699; panel sets font, size, speed, colors, mirror, and fullscreen &mdash; your choices are remembered.</li>
+                <li><strong>Make it yours.</strong> The side panel sets font, size, speed, colors, mirror, and fullscreen &mdash; your choices are remembered. Drag its edge to resize it, or hide it with the &raquo; button.</li>
             </ol>
             <p class="modal-hint welcome-tip">
                 Tip: <em>italics</em> in your script show up as highlighted riff sections, and [bracketed text]

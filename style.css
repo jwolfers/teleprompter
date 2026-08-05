@@ -149,54 +149,49 @@ button.full-width {
     box-shadow: 0 0 8px rgba(74, 111, 165, 0.3);
 }
 
-/* ===== RIGHT PANEL (tabs: Script | Display) ===== */
+/* ===== RIGHT PANEL (script + display settings) ===== */
 #side-panel {
     width: 232px;
     flex-shrink: 0;
     background: #111;
-    border-left: 1px solid #333;
     padding: 40px 14px 14px;
     display: flex;
     flex-direction: column;
+    gap: 12px;
     overflow-y: auto;
     z-index: 10;
 }
 
-#side-panel.collapsed {
+#side-panel.collapsed,
+#panel-resizer.collapsed {
     display: none;
 }
 
-#panel-tabs {
-    display: flex;
-    gap: 4px;
-    margin-bottom: 16px;
-    border-bottom: 1px solid #333;
-    padding-bottom: 8px;
+/* Drag handle between the prompter and the panel */
+#panel-resizer {
+    width: 6px;
+    flex-shrink: 0;
+    background: var(--panel-bg, #111);
+    border-left: 1px solid #333;
+    cursor: ew-resize;
+    z-index: 10;
 }
 
-.tab-btn {
-    flex: 1;
-    padding: 6px 4px;
-    font-size: 12px;
-    background: none;
-    border: 1px solid transparent;
-    color: #888;
+#panel-resizer:hover,
+body.resizing-panel #panel-resizer {
+    background: #4a6fa5;
 }
 
-.tab-btn:hover {
-    background: #2a2a3e;
+body.resizing-panel {
+    cursor: ew-resize;
+    user-select: none;
 }
 
-.tab-btn.active {
-    background: #2a2a3e;
-    border-color: #444;
-    color: #fff;
-}
-
-.tab-page {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+.panel-divider {
+    border: none;
+    border-top: 1px solid #333;
+    margin: 4px 0;
+    width: 100%;
 }
 
 .side-hint {
@@ -399,13 +394,17 @@ body.is-electron #btn-toggle-settings {
 
 /* ===== FULLSCREEN ADJUSTMENTS ===== */
 :fullscreen #side-panel,
-:-webkit-full-screen #side-panel {
+:-webkit-full-screen #side-panel,
+:fullscreen #panel-resizer,
+:-webkit-full-screen #panel-resizer {
     opacity: 0;
     transition: opacity 0.3s;
 }
 
 :fullscreen #side-panel:hover,
-:-webkit-full-screen #side-panel:hover {
+:-webkit-full-screen #side-panel:hover,
+:fullscreen #panel-resizer:hover,
+:-webkit-full-screen #panel-resizer:hover {
     opacity: 1;
 }
 
