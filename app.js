@@ -310,6 +310,7 @@ function applySettings() {
     speedVal.textContent = ctrlSpeed.value + ' px/s';
     opacityVal.textContent = ctrlOpacity.value + '%';
 
+    updateDayNightUI();
     saveSettings();
 }
 
@@ -364,6 +365,38 @@ ctrlFont.addEventListener('change', applySettings);
 });
 ctrlTextColor.addEventListener('input', applySettings);
 ctrlBgColor.addEventListener('input', applySettings);
+
+
+// ===== DAY / NIGHT MODE =====
+
+const btnDayNight = $('#btn-daynight');
+
+// Perceived luminance of the current prompter background (0-255)
+function bgLuminance() {
+    const hex = ctrlBgColor.value;
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return 0.299 * r + 0.587 * g + 0.114 * b;
+}
+
+// The button always offers the mode you'd switch TO
+function updateDayNightUI() {
+    const day = bgLuminance() > 128;
+    document.body.classList.toggle('light-bg', day);
+    btnDayNight.textContent = day ? '🌙 Night mode' : '☀️ Day mode';
+}
+
+btnDayNight.addEventListener('click', () => {
+    if (bgLuminance() > 128) {
+        ctrlTextColor.value = '#ffffff';
+        ctrlBgColor.value = '#000000';
+    } else {
+        ctrlTextColor.value = '#000000';
+        ctrlBgColor.value = '#ffffff';
+    }
+    applySettings();
+});
 
 
 // ===== SCROLL MODE =====

@@ -137,6 +137,17 @@ button.full-width {
     z-index: 5;
 }
 
+/* On a light background, fade already-read text with white instead of black */
+body.light-bg #prompter-container::before {
+    background: linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0.75) 0%,
+        rgba(255, 255, 255, 0.55) 60%,
+        rgba(255, 255, 255, 0.25) 90%,
+        transparent 100%
+    );
+}
+
 /* Reading guide line */
 #prompter-container::after {
     content: '';
@@ -667,16 +678,40 @@ body.is-electron #btn-close-app {
     display: flex;
 }
 
-/* Electron frameless window drag region: thin strip at the very top */
+/* Electron frameless window drag region: grab strip at the very top */
 #drag-bar {
     position: fixed;
     top: 0;
     left: 0;
-    height: 8px;
+    height: 26px;
     width: 100%;
     cursor: move;
     z-index: 2500;
     -webkit-app-region: drag;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.07), transparent);
+}
+
+/* Centered grip dots so the handle is discoverable
+   (always visible: drag regions swallow mouse events, so :hover never fires) */
+#drag-bar::before {
+    content: '';
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90px;
+    height: 6px;
+    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.45) 1.5px, transparent 2px);
+    background-size: 10px 6px;
+}
+
+/* Dark grip on a light prompter background */
+body.light-bg #drag-bar {
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.07), transparent);
+}
+
+body.light-bg #drag-bar::before {
+    background-image: radial-gradient(circle, rgba(0, 0, 0, 0.4) 1.5px, transparent 2px);
 }
 
 /* Version stamp */
