@@ -7,12 +7,10 @@ const state = {
     animationFrame: null,
     lastTimestamp: null,
 
-    // Script versions
-    originalScript: '',     // Original pasted content
-    editedScript: '',       // Current working version with all edits
+    // Current working version of the script (clean HTML, no display markup)
+    editedScript: '',
 
     // Paragraph tracking
-    currentParagraphIndex: 0,
     paragraphs: [],
 
     // Timer
@@ -30,11 +28,9 @@ const state = {
 
 // ===== DOM REFS =====
 const $ = (sel) => document.querySelector(sel);
-const editView = $('#edit-view');
-const prompterView = $('#prompter-view');
-const editor = $('#editor');
 const prompterContent = $('#prompter-content');
 const prompterContainer = $('#prompter-container');
+const sidePanel = $('#side-panel');
 
 // Controls
 const ctrlFont = $('#ctrl-font');
@@ -45,44 +41,64 @@ const ctrlTextColor = $('#ctrl-text-color');
 const ctrlBgColor = $('#ctrl-bg-color');
 const ctrlSpeed = $('#ctrl-speed');
 const ctrlOpacity = $('#ctrl-opacity');
-const ctrlCleanParas = $('#ctrl-clean-paras');
 
 // Buttons
-const btnStart = $('#btn-start');
-const btnBack = $('#btn-back');
 const btnPlayPause = $('#btn-play-pause');
 const btnReset = $('#btn-reset');
 const btnFullscreen = $('#btn-fullscreen');
 const btnMirror = $('#btn-mirror');
 const btnClear = $('#btn-clear');
 
-// Electron close buttons
-const isElectron = navigator.userAgent.includes('Electron');
-if (isElectron) {
-    document.querySelectorAll('.electron-only').forEach(el => {
-        el.classList.remove('electron-only');
-        el.classList.add('electron-show');
-    });
-    const closeWindow = () => window.close();
-    $('#btn-close-edit').addEventListener('click', closeWindow);
-    $('#btn-close-prompter').addEventListener('click', closeWindow);
-}
-
-// Spinner inputs (number inputs next to sliders)
+// Value labels next to sliders
 const fontSizeVal = $('#font-size-val');
 const widthVal = $('#width-val');
 const lineHeightVal = $('#line-height-val');
 const speedVal = $('#speed-val');
 const opacityVal = $('#opacity-val');
 
-// New UI elements
+// Other UI elements
 const progressFill = $('#progress-fill');
 const timerDisplay = $('#timer-display');
 const countdownOverlay = $('#countdown-overlay');
 const keyboardHints = $('#keyboard-hints');
 
+// Electron: show drag bar and the close button at the top right of the window
+const isElectron = navigator.userAgent.includes('Electron');
+if (isElectron) {
+    document.body.classList.add('is-electron');
+    $('#btn-close-app').addEventListener('click', () => window.close());
+}
 
-// ===== EDITOR =====
+
+// ===== SCRIPT CONTENT =====
+
+const PLACEHOLDER = 'Paste your script here...';
+
+function isPlaceholder() {
+    return prompterContent.textContent.trim() === PLACEHOLDER;
+}
+
+function hasScript() {
+    return prompterContent.textContent.trim() !== '' && !isPlaceholder();
+}
+
+// Load clean HTML into the prompter (adds riff/stage-direction/paragraph markup)
+function setScript(html, { keepScroll = false } = {}) {
+    state.editedScript = html;
+    prompterContent.innerHTML = processContentForDisplay(html);
+    state.paragraphs = parseParagraphs();
+    if (keepScroll) {
+        positionContent();
+    } else {
+        resetScroll();
+    }
+}
+
+// Place the content according to the current scroll position
+function positionContent() {
+    const startPosition = prompterContainer.offsetHeight * 0.7;
+    prompterContent.style.top = (startPosition - state.scrollPosition) + 'px';
+}
 
 // Remove empty paragraphs ("extra paragraph marks") between paragraphs
 function stripEmptyParagraphs(html) {
@@ -93,58 +109,6 @@ function stripEmptyParagraphs(html) {
     });
     return doc.body.innerHTML || '<p><br></p>';
 }
-
-function cleanParagraphsIfEnabled(html) {
-    return ctrlCleanParas.checked ? stripEmptyParagraphs(html) : html;
-}
-
-ctrlCleanParas.addEventListener('change', () => {
-    // Turning the toggle on cleans whatever is already in the editor
-    const placeholder = editor.textContent.trim() === 'Paste your script here...';
-    if (ctrlCleanParas.checked && editor.textContent.trim() && !placeholder) {
-        editor.innerHTML = stripEmptyParagraphs(editor.innerHTML);
-        state.editedScript = editor.innerHTML;
-    }
-    saveSettings();
-});
-
-editor.addEventListener('paste', (e) => {
-    e.preventDefault();
-    const html = e.clipboardData.getData('text/html');
-    const text = e.clipboardData.getData('text/plain');
-
-    if (html) {
-        const cleaned = cleanParagraphsIfEnabled(cleanGoogleDocsHtml(html));
-        document.execCommand('insertHTML', false, cleaned);
-    } else {
-        const cleanedText = ctrlCleanParas.checked
-            ? text.replace(/\n[ \t]*(\n[ \t]*)+/g, '\n')
-            : text;
-        document.execCommand('insertText', false, cleanedText);
-    }
-
-    // After paste, adjust editor background to ensure text is visible
-    requestAnimationFrame(() => {
-        adjustEditorBackground();
-        // Store original script on first paste (if empty before)
-        if (!state.originalScript) {
-            state.originalScript = editor.innerHTML;
-        }
-        // Update edited script
-        state.editedScript = editor.innerHTML;
-    });
-});
-
-editor.addEventListener('focus', () => {
-    if (editor.textContent.trim() === 'Paste your script here...') {
-        editor.innerHTML = '<p><br></p>';
-    }
-});
-
-// Track edits in the editor
-editor.addEventListener('input', () => {
-    state.editedScript = editor.innerHTML;
-});
 
 function cleanGoogleDocsHtml(html) {
     const parser = new DOMParser();
@@ -179,114 +143,6 @@ function cleanGoogleDocsHtml(html) {
     });
 
     return body.innerHTML;
-}
-
-// Scan pasted text colors and pick a background that makes them visible
-function adjustEditorBackground() {
-    const elements = editor.querySelectorAll('*');
-    let darkCount = 0;
-    let lightCount = 0;
-
-    // Check explicit color styles on elements
-    elements.forEach(el => {
-        const color = el.style.color;
-        if (color) {
-            const brightness = getColorBrightness(color);
-            if (brightness !== null) {
-                if (brightness < 128) darkCount++;
-                else lightCount++;
-            }
-        }
-    });
-
-    // Also check unstyled text (inherits default color — typically black from Google Docs)
-    const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
-    while (walker.nextNode()) {
-        const parent = walker.currentNode.parentElement;
-        if (parent && !parent.style.color && walker.currentNode.textContent.trim()) {
-            // No explicit color = default (black in Google Docs)
-            darkCount++;
-        }
-    }
-
-    // If most text is dark, use light background; if most is light, use dark background
-    if (darkCount >= lightCount) {
-        editor.classList.remove('dark-bg');
-    } else {
-        editor.classList.add('dark-bg');
-    }
-}
-
-// Parse a CSS color string and return its brightness (0-255)
-function getColorBrightness(colorStr) {
-    // Handle rgb(r, g, b) format
-    const rgbMatch = colorStr.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-    if (rgbMatch) {
-        const r = parseInt(rgbMatch[1]);
-        const g = parseInt(rgbMatch[2]);
-        const b = parseInt(rgbMatch[3]);
-        return (r * 299 + g * 587 + b * 114) / 1000;
-    }
-
-    // Handle hex format
-    const hexMatch = colorStr.match(/^#?([0-9a-f]{6}|[0-9a-f]{3})$/i);
-    if (hexMatch) {
-        let hex = hexMatch[1];
-        if (hex.length === 3) {
-            hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
-        }
-        const r = parseInt(hex.slice(0, 2), 16);
-        const g = parseInt(hex.slice(2, 4), 16);
-        const b = parseInt(hex.slice(4, 6), 16);
-        return (r * 299 + g * 587 + b * 114) / 1000;
-    }
-
-    // Named colors we commonly see
-    const namedColors = {
-        black: 0, white: 255, red: 76, blue: 29, green: 150,
-        yellow: 226, gray: 128, grey: 128,
-    };
-    const lower = colorStr.toLowerCase().trim();
-    if (lower in namedColors) return namedColors[lower];
-
-    return null;
-}
-
-
-// ===== PROMPTER =====
-
-function startPrompter() {
-    const content = state.editedScript || editor.innerHTML;
-    if (!content || editor.textContent.trim() === '' ||
-        editor.textContent.trim() === 'Paste your script here...') {
-        return;
-    }
-
-    // Store edited script if not already set
-    if (!state.editedScript) {
-        state.editedScript = content;
-    }
-
-    prompterContent.innerHTML = processContentForDisplay(content);
-    state.paragraphs = parseParagraphs();
-    applySettings();
-
-    state.scrollPosition = 0;
-    state.currentParagraphIndex = 0;
-
-    // Make prompter content editable when paused
-    prompterContent.setAttribute('contenteditable', 'true');
-    prompterContent.setAttribute('spellcheck', 'false');
-
-    editView.classList.add('hidden');
-    prompterView.classList.remove('hidden');
-
-    // Set initial position after view is rendered
-    // Position so first line is visible at the bottom (70% from top)
-    requestAnimationFrame(() => {
-        const containerHeight = prompterContainer.offsetHeight;
-        prompterContent.style.top = (containerHeight * 0.7) + 'px';
-    });
 }
 
 function processContentForDisplay(html) {
@@ -346,30 +202,6 @@ function processContentForDisplay(html) {
     return body.innerHTML;
 }
 
-function parseParagraphs() {
-    const elements = prompterContent.querySelectorAll('[data-para-index]');
-    return Array.from(elements).map(el => ({
-        index: parseInt(el.getAttribute('data-para-index')),
-        text: el.textContent.trim(),
-        element: el,
-        isRiff: el.querySelector('[data-riff]') !== null || el.hasAttribute('data-riff'),
-        isStageDirection: el.querySelector('[data-stage-direction]') !== null,
-        offsetTop: el.offsetTop,
-    }));
-}
-
-function backToEditor() {
-    stopScrolling();
-
-    // Sync prompter edits back to editor
-    const cleanedContent = reverseProcessContent(prompterContent.innerHTML);
-    state.editedScript = cleanedContent;
-    editor.innerHTML = cleanedContent;
-
-    prompterView.classList.add('hidden');
-    editView.classList.remove('hidden');
-}
-
 // Reverse the processing done in processContentForDisplay
 function reverseProcessContent(html) {
     const parser = new DOMParser();
@@ -383,22 +215,60 @@ function reverseProcessContent(html) {
     body.querySelectorAll('.riff-section').forEach(el => {
         el.classList.remove('riff-section');
         el.removeAttribute('data-riff');
-    });
-
-    body.querySelectorAll('.current-position').forEach(el => {
-        el.classList.remove('current-position');
+        if (!el.getAttribute('class')) el.removeAttribute('class');
     });
 
     body.querySelectorAll('[data-para-index]').forEach(el => {
         el.removeAttribute('data-para-index');
     });
 
-    body.querySelectorAll('[data-stage-direction]').forEach(el => {
-        el.removeAttribute('data-stage-direction');
-    });
-
     return body.innerHTML;
 }
+
+function parseParagraphs() {
+    const elements = prompterContent.querySelectorAll('[data-para-index]');
+    return Array.from(elements).map(el => ({
+        index: parseInt(el.getAttribute('data-para-index')),
+        text: el.textContent.trim(),
+        element: el,
+        isRiff: el.querySelector('[data-riff]') !== null || el.hasAttribute('data-riff'),
+        isStageDirection: el.querySelector('[data-stage-direction]') !== null,
+        offsetTop: el.offsetTop,
+    }));
+}
+
+
+// ===== EDITING (paste and type directly into the prompter) =====
+
+prompterContent.addEventListener('focus', () => {
+    if (isPlaceholder()) {
+        prompterContent.innerHTML = '<p><br></p>';
+    }
+});
+
+prompterContent.addEventListener('paste', (e) => {
+    e.preventDefault();
+    const html = e.clipboardData.getData('text/html');
+    const text = e.clipboardData.getData('text/plain');
+
+    if (html) {
+        const cleaned = stripEmptyParagraphs(cleanGoogleDocsHtml(html));
+        document.execCommand('insertHTML', false, cleaned);
+    } else {
+        const cleanedText = text.replace(/\n[ \t]*(\n[ \t]*)+/g, '\n');
+        document.execCommand('insertText', false, cleanedText);
+    }
+
+    // Re-process the whole script so riffs/stage directions get styled
+    requestAnimationFrame(() => {
+        setScript(reverseProcessContent(prompterContent.innerHTML), { keepScroll: true });
+    });
+});
+
+// Track typed edits (no rebuild — that would move the cursor)
+prompterContent.addEventListener('input', () => {
+    state.editedScript = reverseProcessContent(prompterContent.innerHTML);
+});
 
 
 // ===== SETTINGS =====
@@ -409,20 +279,29 @@ function applySettings() {
     prompterContent.style.width = ctrlWidth.value + '%';
     prompterContent.style.lineHeight = (ctrlLineHeight.value / 100).toFixed(1);
     prompterContent.style.color = ctrlTextColor.value;
-    // Apply background with opacity
+
+    // Apply window opacity to all backgrounds
     const opacity = parseInt(ctrlOpacity.value) / 100;
     const bgHex = ctrlBgColor.value;
     const r = parseInt(bgHex.slice(1, 3), 16);
     const g = parseInt(bgHex.slice(3, 5), 16);
     const b = parseInt(bgHex.slice(5, 7), 16);
-    const bgRgba = `rgba(${r}, ${g}, ${b}, ${opacity})`;
-    prompterContainer.style.background = bgRgba;
-    prompterView.style.background = opacity < 1 ? 'transparent' : bgHex;
+    prompterContainer.style.background = `rgba(${r}, ${g}, ${b}, ${opacity})`;
     document.documentElement.style.background = opacity < 1 ? 'transparent' : '';
     document.body.style.background = opacity < 1 ? 'transparent' : '';
-    $('#control-bar').style.background = opacity < 1 ? `rgba(17, 17, 17, ${opacity})` : '#111';
-    $('#transport-bar').style.background = opacity < 1 ? `rgba(17, 17, 17, ${opacity})` : '#111';
+    const barBg = `rgba(17, 17, 17, ${opacity})`;
+    sidePanel.style.background = barBg;
+    $('#bottom-bar').style.background = barBg;
+
     state.speed = parseInt(ctrlSpeed.value);
+
+    // Update value labels next to the sliders
+    fontSizeVal.textContent = ctrlFontSize.value;
+    widthVal.textContent = ctrlWidth.value;
+    lineHeightVal.textContent = (ctrlLineHeight.value / 100).toFixed(1);
+    speedVal.textContent = ctrlSpeed.value;
+    opacityVal.textContent = ctrlOpacity.value + '%';
+
     saveSettings();
 }
 
@@ -440,8 +319,7 @@ function saveSettings() {
         bgColor: ctrlBgColor.value,
         speed: ctrlSpeed.value,
         opacity: ctrlOpacity.value,
-        mirrored: state.mirrored,
-        cleanParas: ctrlCleanParas.checked
+        mirrored: state.mirrored
     }));
 }
 
@@ -454,72 +332,21 @@ function loadSettings() {
     }
     if (!saved) return;
     if (saved.font) ctrlFont.value = saved.font;
-    if (saved.fontSize) { ctrlFontSize.value = saved.fontSize; fontSizeVal.value = saved.fontSize; }
-    if (saved.width) { ctrlWidth.value = saved.width; widthVal.value = saved.width; }
-    if (saved.lineHeight) { ctrlLineHeight.value = saved.lineHeight; lineHeightVal.value = saved.lineHeight; }
+    if (saved.fontSize) ctrlFontSize.value = saved.fontSize;
+    if (saved.width) ctrlWidth.value = saved.width;
+    if (saved.lineHeight) ctrlLineHeight.value = saved.lineHeight;
     if (saved.textColor) ctrlTextColor.value = saved.textColor;
     if (saved.bgColor) ctrlBgColor.value = saved.bgColor;
-    if (saved.speed) { ctrlSpeed.value = saved.speed; speedVal.value = saved.speed; }
-    if (saved.opacity) { ctrlOpacity.value = saved.opacity; opacityVal.value = saved.opacity; }
-    if (typeof saved.cleanParas === 'boolean') ctrlCleanParas.checked = saved.cleanParas;
+    if (saved.speed) ctrlSpeed.value = saved.speed;
+    if (saved.opacity) ctrlOpacity.value = saved.opacity;
     if (saved.mirrored) toggleMirror();
     applySettings();
 }
 
 ctrlFont.addEventListener('change', applySettings);
-
-// Font size: slider <-> spinner sync
-ctrlFontSize.addEventListener('input', () => {
-    fontSizeVal.value = ctrlFontSize.value;
-    applySettings();
+[ctrlFontSize, ctrlWidth, ctrlLineHeight, ctrlSpeed, ctrlOpacity].forEach(ctrl => {
+    ctrl.addEventListener('input', applySettings);
 });
-fontSizeVal.addEventListener('input', () => {
-    ctrlFontSize.value = fontSizeVal.value;
-    applySettings();
-});
-
-// Width: slider <-> spinner sync
-ctrlWidth.addEventListener('input', () => {
-    widthVal.value = ctrlWidth.value;
-    applySettings();
-});
-widthVal.addEventListener('input', () => {
-    ctrlWidth.value = widthVal.value;
-    applySettings();
-});
-
-// Line height: slider <-> spinner sync
-ctrlLineHeight.addEventListener('input', () => {
-    lineHeightVal.value = ctrlLineHeight.value;
-    applySettings();
-});
-lineHeightVal.addEventListener('input', () => {
-    ctrlLineHeight.value = lineHeightVal.value;
-    applySettings();
-});
-
-// Speed: slider <-> spinner sync
-ctrlSpeed.addEventListener('input', () => {
-    speedVal.value = ctrlSpeed.value;
-    state.speed = parseInt(ctrlSpeed.value);
-    saveSettings();
-});
-speedVal.addEventListener('input', () => {
-    ctrlSpeed.value = speedVal.value;
-    state.speed = parseInt(speedVal.value);
-    saveSettings();
-});
-
-// Opacity: slider <-> spinner sync
-ctrlOpacity.addEventListener('input', () => {
-    opacityVal.value = ctrlOpacity.value;
-    applySettings();
-});
-opacityVal.addEventListener('input', () => {
-    ctrlOpacity.value = opacityVal.value;
-    applySettings();
-});
-
 ctrlTextColor.addEventListener('input', applySettings);
 ctrlBgColor.addEventListener('input', applySettings);
 
@@ -535,6 +362,7 @@ function togglePlayPause() {
 }
 
 function startScrolling() {
+    if (!hasScript()) return;
     // Show countdown on first play (scrollPosition near 0)
     if (state.scrollPosition < 10 && !state.playing) {
         showCountdown(() => {
@@ -553,6 +381,8 @@ function doStartScrolling() {
     btnPlayPause.innerHTML = '&#9646;&#9646; Pause';
     // Disable editing while scrolling
     prompterContent.setAttribute('contenteditable', 'false');
+    prompterContent.blur();
+    window.getSelection().removeAllRanges();
     state.animationFrame = requestAnimationFrame(animate);
 }
 
@@ -604,13 +434,7 @@ function resetScroll() {
     state.prompterStartTime = null;
     timerDisplay.textContent = '';
     updateProgress(0, 1);
-    const containerHeight = prompterContainer.offsetHeight;
-    prompterContent.style.top = (containerHeight * 0.7) + 'px';
-    state.currentParagraphIndex = 0;
-
-    prompterContent.querySelectorAll('.current-position').forEach(el => {
-        el.classList.remove('current-position');
-    });
+    positionContent();
 }
 
 
@@ -630,7 +454,7 @@ function toggleFullscreen() {
     if (document.fullscreenElement) {
         document.exitFullscreen();
     } else {
-        prompterView.requestFullscreen();
+        document.documentElement.requestFullscreen();
     }
 }
 
@@ -701,67 +525,6 @@ function showCountdown(callback) {
         }
     };
     setTimeout(tick, 800);
-}
-
-
-// ===== SAVE/LOAD SCRIPTS =====
-
-function saveScript() {
-    const content = state.editedScript || editor.innerHTML;
-    if (!content || editor.textContent.trim() === '' ||
-        editor.textContent.trim() === 'Paste your script here...') {
-        return;
-    }
-
-    const name = prompt('Name this script:');
-    if (!name) return;
-
-    const scripts = JSON.parse(localStorage.getItem('teleprompter_scripts') || '{}');
-    scripts[name] = {
-        html: content,
-        date: new Date().toISOString(),
-    };
-    localStorage.setItem('teleprompter_scripts', JSON.stringify(scripts));
-}
-
-function showLoadScripts() {
-    const scripts = JSON.parse(localStorage.getItem('teleprompter_scripts') || '{}');
-    const list = $('#scripts-list');
-    const modal = $('#scripts-modal');
-
-    if (Object.keys(scripts).length === 0) {
-        list.innerHTML = '<p style="color: #666; font-size: 13px;">No saved scripts yet.</p>';
-    } else {
-        list.innerHTML = '';
-        Object.entries(scripts).forEach(([name, data]) => {
-            const item = document.createElement('div');
-            item.className = 'script-item';
-            const date = new Date(data.date).toLocaleDateString();
-            item.innerHTML = `
-                <span class="script-name">${name}</span>
-                <span class="script-date">${date}</span>
-                <span class="script-delete" title="Delete">&times;</span>
-            `;
-            item.querySelector('.script-name').addEventListener('click', () => {
-                const loadedHtml = cleanParagraphsIfEnabled(data.html);
-                editor.innerHTML = loadedHtml;
-                state.editedScript = loadedHtml;
-                adjustEditorBackground();
-                modal.classList.add('hidden');
-            });
-            item.querySelector('.script-delete').addEventListener('click', (e) => {
-                e.stopPropagation();
-                delete scripts[name];
-                localStorage.setItem('teleprompter_scripts', JSON.stringify(scripts));
-                item.remove();
-                if (Object.keys(scripts).length === 0) {
-                    list.innerHTML = '<p style="color: #666; font-size: 13px;">No saved scripts yet.</p>';
-                }
-            });
-            list.appendChild(item);
-        });
-    }
-    modal.classList.remove('hidden');
 }
 
 
@@ -839,23 +602,156 @@ async function fetchGoogleDocHtml(docId) {
     return cleanGoogleDocHtml(rawHtml);
 }
 
-// Apply a Google Doc update to the editor and (if active) prompter view
+// ===== SENTENCE ANCHORING =====
+// When a synced Google Doc update replaces the script mid-read, keep the
+// sentence at the reading guide line in place rather than the pixel offset,
+// so edits above the eyeline don't shift the text being read.
+
+const EYELINE_FRACTION = 0.3; // matches #prompter-container::after in style.css
+
+function splitSentences(text) {
+    return text.split(/(?<=[.!?…])\s+/).filter(s => s.trim());
+}
+
+// Identify the sentence (and paragraph) currently at the reading guide line
+function captureScrollAnchor() {
+    if (state.scrollPosition <= 0) return null; // haven't started reading
+
+    const containerRect = prompterContainer.getBoundingClientRect();
+    const contentRect = prompterContent.getBoundingClientRect();
+    const x = containerRect.left + containerRect.width / 2;
+    const y = containerRect.top + containerRect.height * EYELINE_FRACTION;
+    const contentY = y - contentRect.top; // eyeline in content coordinates
+    if (contentY < 0) return null; // text hasn't reached the guide line yet
+
+    // Sentence under the eyeline, via the caret position at that point
+    let sentence = null;
+    const caret = document.caretRangeFromPoint ? document.caretRangeFromPoint(x, y) : null;
+    if (caret && caret.startContainer.nodeType === Node.TEXT_NODE &&
+        prompterContent.contains(caret.startContainer)) {
+        const paraEl = caret.startContainer.parentElement.closest('[data-para-index]');
+        if (paraEl) {
+            // Character offset of the caret within the paragraph's text
+            let charOffset = caret.startOffset;
+            const walker = document.createTreeWalker(paraEl, NodeFilter.SHOW_TEXT);
+            while (walker.nextNode() && walker.currentNode !== caret.startContainer) {
+                charOffset += walker.currentNode.textContent.length;
+            }
+            const paraText = paraEl.textContent;
+            let pos = 0;
+            for (const s of splitSentences(paraText)) {
+                pos = paraText.indexOf(s, pos);
+                if (charOffset < pos + s.length) { sentence = s.trim(); break; }
+                pos += s.length;
+            }
+        }
+    }
+
+    // Paragraph spanning the eyeline (fuzzy-match fallback if the sentence was edited)
+    let para = null;
+    for (const p of state.paragraphs) {
+        const top = p.element.offsetTop;
+        if (contentY >= top && contentY < top + p.element.offsetHeight) { para = p; break; }
+        if (top > contentY) { para = p; break; } // eyeline is in the gap above this paragraph
+    }
+
+    return {
+        sentence,
+        contentY,
+        paraText: para ? para.text : null,
+        paraFraction: para
+            ? (contentY - para.element.offsetTop) / Math.max(1, para.element.offsetHeight)
+            : 0,
+    };
+}
+
+// Find the anchored sentence in the new content; returns its y offset in
+// content coordinates, or null. Prefers the occurrence nearest the old position.
+function findSentenceY(sentence, oldY) {
+    const nodes = [];
+    let fullText = '';
+    const walker = document.createTreeWalker(prompterContent, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+        nodes.push({ node: walker.currentNode, start: fullText.length });
+        fullText += walker.currentNode.textContent;
+    }
+    if (!fullText) return null;
+
+    // Whitespace-tolerant match on the sentence's words
+    const words = sentence.split(/\s+/).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const re = new RegExp(words.join('\\s+'), 'g');
+    const contentTop = prompterContent.getBoundingClientRect().top;
+    const nodeAt = (offset) => {
+        let entry = nodes[0];
+        for (const n of nodes) { if (n.start <= offset) entry = n; else break; }
+        return entry;
+    };
+
+    let best = null;
+    let m;
+    while ((m = re.exec(fullText)) !== null) {
+        // Map the match's character range back to text nodes and measure it
+        const startEntry = nodeAt(m.index);
+        const endOffset = m.index + m[0].length;
+        const endEntry = nodeAt(endOffset - 1);
+        const range = document.createRange();
+        range.setStart(startEntry.node, m.index - startEntry.start);
+        range.setEnd(endEntry.node,
+            Math.min(endEntry.node.textContent.length, endOffset - endEntry.start));
+        const rect = range.getBoundingClientRect();
+        if (!rect.height) continue;
+        const yPos = rect.top - contentTop;
+        if (best === null || Math.abs(yPos - oldY) < Math.abs(best - oldY)) best = yPos;
+    }
+    return best;
+}
+
+// Fallback: best word-overlap paragraph match, at the same relative depth
+function findParagraphY(paraText, fraction) {
+    const targetWords = new Set(paraText.toLowerCase().split(/\s+/));
+    let best = null;
+    let bestScore = 0.5; // require a majority overlap to accept
+    for (const p of state.paragraphs) {
+        const pWords = p.text.toLowerCase().split(/\s+/);
+        if (!pWords.length) continue;
+        let hits = 0;
+        for (const w of pWords) if (targetWords.has(w)) hits++;
+        const score = hits / Math.max(pWords.length, targetWords.size);
+        if (score > bestScore) { bestScore = score; best = p; }
+    }
+    if (!best) return null;
+    return best.element.offsetTop + fraction * best.element.offsetHeight;
+}
+
+// Re-align the scroll so the anchored sentence sits back on the guide line
+function restoreScrollAnchor(anchor) {
+    if (!anchor) return; // keep the pixel position setScript already applied
+
+    let newY = anchor.sentence ? findSentenceY(anchor.sentence, anchor.contentY) : null;
+    if (newY === null && anchor.paraText) {
+        newY = findParagraphY(anchor.paraText, anchor.paraFraction);
+    }
+    if (newY === null) return; // anchor text was edited away — keep pixel position
+
+    const containerHeight = prompterContainer.offsetHeight;
+    const startPosition = containerHeight * 0.7;
+    const eyeline = containerHeight * EYELINE_FRACTION;
+    const maxScroll = startPosition + prompterContent.scrollHeight;
+    state.scrollPosition = Math.min(maxScroll,
+        Math.max(0, startPosition - eyeline + newY));
+    positionContent();
+    updateProgress(state.scrollPosition, maxScroll);
+}
+
+// Apply a Google Doc update to the prompter, preserving the reading position
 function applyGoogleDocContent(html) {
     // Skip if content hasn't changed
     if (html === state.gdocLastHtml) return false;
     state.gdocLastHtml = html;
 
-    html = cleanParagraphsIfEnabled(html);
-    editor.innerHTML = html;
-    state.editedScript = html;
-    state.originalScript = html;
-    adjustEditorBackground();
-
-    // If prompter is currently showing, update it in-place preserving scroll position
-    if (!prompterView.classList.contains('hidden')) {
-        prompterContent.innerHTML = processContentForDisplay(html);
-        state.paragraphs = parseParagraphs();
-    }
+    const anchor = captureScrollAnchor();
+    setScript(stripEmptyParagraphs(html), { keepScroll: true });
+    restoreScrollAnchor(anchor);
     return true;
 }
 
@@ -897,7 +793,7 @@ function unlinkGoogleDoc() {
     updateGdocLinkUI();
 }
 
-// Show/hide the linked-doc badge next to the Google Doc button
+// Show/hide the linked-doc badge
 function updateGdocLinkUI() {
     const badge = $('#gdoc-linked-badge');
     if (state.googleDocId) {
@@ -998,8 +894,17 @@ $('#gdoc-linked-badge').addEventListener('contextmenu', (e) => {
 });
 
 
-// ===== TOUCH SUPPORT =====
+// ===== MOUSE & TOUCH CONTROLS =====
 
+// Mouse wheel scrubs through the script
+prompterContainer.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const delta = e.deltaY * 0.5;
+    state.scrollPosition = Math.max(0, state.scrollPosition + delta);
+    positionContent();
+}, { passive: false });
+
+// Touch drag scrubs through the script
 let touchStartY = null;
 let touchStartScrollPos = null;
 
@@ -1013,9 +918,7 @@ prompterContainer.addEventListener('touchmove', (e) => {
     e.preventDefault();
     const deltaY = touchStartY - e.touches[0].clientY;
     state.scrollPosition = Math.max(0, touchStartScrollPos + deltaY);
-    const containerHeight = prompterContainer.offsetHeight;
-    const startPosition = containerHeight * 0.7;
-    prompterContent.style.top = (startPosition - state.scrollPosition) + 'px';
+    positionContent();
 }, { passive: false });
 
 prompterContainer.addEventListener('touchend', () => {
@@ -1037,8 +940,7 @@ function initRemoteControl() {
             case 'reset': resetScroll(); break;
             case 'speed':
                 ctrlSpeed.value = value;
-                speedVal.value = value;
-                state.speed = parseInt(value);
+                applySettings();
                 break;
             case 'scroll':
                 if (value === 'up') {
@@ -1046,17 +948,10 @@ function initRemoteControl() {
                 } else {
                     state.scrollPosition += 100;
                 }
-                const ch = prompterContainer.offsetHeight;
-                prompterContent.style.top = (ch * 0.7 - state.scrollPosition) + 'px';
+                positionContent();
                 break;
         }
     };
-}
-
-function broadcastAction(action, value) {
-    if (state.broadcastChannel) {
-        state.broadcastChannel.postMessage({ action, value });
-    }
 }
 
 initRemoteControl();
@@ -1065,17 +960,18 @@ initRemoteControl();
 // ===== KEYBOARD SHORTCUTS =====
 
 document.addEventListener('keydown', (e) => {
-    if (prompterView.classList.contains('hidden')) return;
-
-    // Don't trigger shortcuts if actively editing the prompter content
+    // While typing in the script (paused, caret in text): only Esc, which
+    // leaves editing so the shortcuts work again
     if (document.activeElement === prompterContent &&
         prompterContent.getAttribute('contenteditable') === 'true' &&
         !state.playing) {
+        if (e.key === 'Escape') prompterContent.blur();
         return;
     }
 
-    const containerHeight = prompterContainer.offsetHeight;
-    const startPosition = containerHeight * 0.7;
+    // Ignore shortcuts while typing in panel inputs or the modal
+    const tag = document.activeElement && document.activeElement.tagName;
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
 
     switch (e.key) {
         case ' ':
@@ -1085,37 +981,35 @@ document.addEventListener('keydown', (e) => {
         case 'ArrowUp':
             e.preventDefault();
             ctrlSpeed.value = Math.min(100, parseInt(ctrlSpeed.value) + 5);
-            speedVal.value = ctrlSpeed.value;
-            state.speed = parseInt(ctrlSpeed.value);
+            applySettings();
             break;
         case 'ArrowDown':
             e.preventDefault();
             ctrlSpeed.value = Math.max(0, parseInt(ctrlSpeed.value) - 5);
-            speedVal.value = ctrlSpeed.value;
-            state.speed = parseInt(ctrlSpeed.value);
+            applySettings();
             break;
         case 'ArrowLeft':
             e.preventDefault();
             state.scrollPosition = Math.max(0, state.scrollPosition - 100);
-            prompterContent.style.top = (startPosition - state.scrollPosition) + 'px';
+            positionContent();
             break;
         case 'ArrowRight':
             e.preventDefault();
             state.scrollPosition += 100;
-            prompterContent.style.top = (startPosition - state.scrollPosition) + 'px';
+            positionContent();
             break;
         case '.': {
             // Nudge forward one line
             const lineH = parseInt(ctrlFontSize.value) * (parseInt(ctrlLineHeight.value) / 100);
             state.scrollPosition += lineH;
-            prompterContent.style.top = (startPosition - state.scrollPosition) + 'px';
+            positionContent();
             break;
         }
         case ',': {
             // Nudge back one line
             const lineH = parseInt(ctrlFontSize.value) * (parseInt(ctrlLineHeight.value) / 100);
             state.scrollPosition = Math.max(0, state.scrollPosition - lineH);
-            prompterContent.style.top = (startPosition - state.scrollPosition) + 'px';
+            positionContent();
             break;
         }
         case 'f':
@@ -1129,82 +1023,58 @@ document.addEventListener('keydown', (e) => {
             break;
         case '[':
             ctrlOpacity.value = Math.max(10, parseInt(ctrlOpacity.value) - 10);
-            opacityVal.value = ctrlOpacity.value;
             applySettings();
             break;
         case ']':
             ctrlOpacity.value = Math.min(100, parseInt(ctrlOpacity.value) + 10);
-            opacityVal.value = ctrlOpacity.value;
             applySettings();
             break;
         case '?':
             keyboardHints.classList.toggle('hidden');
             break;
         case 'Escape':
-            if (!keyboardHints.classList.contains('hidden')) {
-                keyboardHints.classList.add('hidden');
-            } else if (!document.fullscreenElement) {
-                backToEditor();
-            }
+            keyboardHints.classList.add('hidden');
+            if (!welcomeModal.classList.contains('hidden')) dismissWelcome();
             break;
     }
 });
 
 
-// ===== EVENT LISTENERS =====
+// ===== PANEL & BUTTONS =====
 
-btnStart.addEventListener('click', startPrompter);
-btnBack.addEventListener('click', backToEditor);
 btnPlayPause.addEventListener('click', togglePlayPause);
 btnReset.addEventListener('click', resetScroll);
 btnFullscreen.addEventListener('click', toggleFullscreen);
-
-// Toggle controls visibility
-const btnToggleControls = $('#btn-toggle-controls');
-const controlBarControls = $('#control-bar-controls');
-btnToggleControls.addEventListener('click', () => {
-    btnToggleControls.classList.toggle('collapsed');
-    controlBarControls.classList.toggle('collapsed');
-});
 btnMirror.addEventListener('click', toggleMirror);
+
 btnClear.addEventListener('click', () => {
-    editor.innerHTML = '<p><br></p>';
-    editor.focus();
-    state.originalScript = '';
+    prompterContent.innerHTML = '<p><br></p>';
     state.editedScript = '';
+    resetScroll();
+    prompterContent.focus();
 });
 
-// Track edits in prompter content
-prompterContent.addEventListener('input', () => {
-    // Edits will be synced on backToEditor()
+// Gear button shows/hides the right panel
+$('#btn-toggle-settings').addEventListener('click', () => {
+    sidePanel.classList.toggle('collapsed');
 });
 
-prompterContainer.addEventListener('wheel', (e) => {
-    e.preventDefault();
-    const delta = e.deltaY * 0.5;
-    state.scrollPosition += delta;
-    state.scrollPosition = Math.max(0, state.scrollPosition);
-    const containerHeight = prompterContainer.offsetHeight;
-    const startPosition = containerHeight * 0.7;
-    prompterContent.style.top = (startPosition - state.scrollPosition) + 'px';
-}, { passive: false });
-
-
-// ===== SAVE/LOAD SCRIPT BUTTONS =====
-$('#btn-save-script').addEventListener('click', saveScript);
-$('#btn-load-script').addEventListener('click', showLoadScripts);
-$('#btn-close-scripts').addEventListener('click', () => {
-    $('#scripts-modal').classList.add('hidden');
+// Tabs in the right panel
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b =>
+            b.classList.toggle('active', b === btn));
+        document.querySelectorAll('.tab-page').forEach(p =>
+            p.classList.add('hidden'));
+        $('#tab-' + btn.dataset.tab).classList.remove('hidden');
+    });
 });
-$('#scripts-modal').addEventListener('click', (e) => {
-    if (e.target === $('#scripts-modal')) $('#scripts-modal').classList.add('hidden');
-});
+
 
 // ===== DEMO SCRIPT =====
 
-const btnDemo = $('#btn-demo');
-btnDemo.addEventListener('click', () => {
-    editor.innerHTML = `
+function loadDemoScript() {
+    setScript(`
 <p>Good evening, and welcome to tonight's presentation on the future of economics.</p>
 <p>Before we begin, I want to thank our hosts for putting this event together. It's a real pleasure to be here with all of you tonight.</p>
 <p>[Pause for applause]</p>
@@ -1225,15 +1095,53 @@ btnDemo.addEventListener('click', () => {
 <p>[Pause — let that land]</p>
 <p>We have the tools. We have the data. And increasingly, we have the humility to admit when we're wrong and update our thinking. That gives me enormous hope for what the next generation of economists will accomplish.</p>
 <p>Thank you very much. I'm happy to take your questions.</p>
-<p>[Q&A — aim for 15 minutes]</p>
-`.trim();
-    state.editedScript = editor.innerHTML;
-    adjustEditorBackground();
+<p>[Q&amp;A — aim for 15 minutes]</p>
+`.trim());
+}
+
+$('#btn-demo').addEventListener('click', loadDemoScript);
+
+
+// ===== FIRST-RUN WELCOME =====
+// Quick lesson shown once, the first time the app is opened
+
+const WELCOME_KEY = 'teleprompter_welcome_seen';
+const welcomeModal = $('#welcome-modal');
+
+function dismissWelcome() {
+    welcomeModal.classList.add('hidden');
+    localStorage.setItem(WELCOME_KEY, '1');
+}
+
+$('#btn-welcome-close').addEventListener('click', dismissWelcome);
+
+$('#btn-welcome-demo').addEventListener('click', () => {
+    dismissWelcome();
+    loadDemoScript();
 });
+
+welcomeModal.addEventListener('click', (e) => {
+    if (e.target === welcomeModal) dismissWelcome();
+});
+
+function maybeShowWelcome() {
+    if (!localStorage.getItem(WELCOME_KEY)) {
+        welcomeModal.classList.remove('hidden');
+    }
+}
+
+
+// ===== INIT =====
 
 // Restore saved preferences from the previous session
 loadSettings();
 
+// Show the quick lesson on the very first open
+maybeShowWelcome();
+
+// Put the (placeholder) content in its starting position
+requestAnimationFrame(positionContent);
+
 // Version stamp
-const VERSION_TIMESTAMP = '2026-07-24 v6 — manual scroll only';
+const VERSION_TIMESTAMP = '2026-08-05 v9 — first-run welcome';
 document.getElementById('version-stamp').textContent = VERSION_TIMESTAMP;

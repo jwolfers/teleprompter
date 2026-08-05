@@ -11,40 +11,15 @@
 </head>
 <body>
     <div id="drag-bar" class="electron-only"></div>
-    <!-- EDIT VIEW: Where user pastes/edits their script -->
-    <div id="edit-view">
-        <div class="edit-header">
-            <h1>Teleprompter</h1>
-            <div class="edit-actions">
-                <button id="btn-demo" title="Load a sample script">Demo Script</button>
-                <button id="btn-gdoc" title="Import from Google Docs">Google Doc</button>
-                <span id="gdoc-linked-badge" class="gdoc-badge hidden" title="Click to refresh · Right-click to unlink">🔗 Linked</span>
-                <button id="btn-save-script" title="Save script to browser">Save</button>
-                <button id="btn-load-script" title="Load a saved script">Load</button>
-                <label class="clean-paras-toggle" title="Automatically remove empty paragraphs from pasted or imported scripts">
-                    <input type="checkbox" id="ctrl-clean-paras" checked>
-                    Clear extra &para; marks
-                </label>
-                <button id="btn-clear" title="Clear all text">Clear</button>
-                <button id="btn-start" class="primary">Start Prompter</button>
-                <button id="btn-close-edit" class="electron-only" title="Close window">&#x2715;</button>
-            </div>
-        </div>
-        <div class="edit-instructions">
-            Paste your script below. Formatting from Google Docs is preserved.
-            <em>Italics</em> or "riff:" signal tangent sections.
-            <span class="bracket-example">[Bracketed text]</span> = stage directions (not spoken).
-        </div>
-        <div id="editor" contenteditable="true" spellcheck="false">
-            <p>Paste your script here...</p>
-        </div>
-    </div>
+    <button id="btn-close-app" class="electron-only" title="Close">&#x2715;</button>
+    <button id="btn-toggle-settings" title="Show/hide panel">&#x2699;</button>
 
-    <!-- PROMPTER VIEW: The teleprompter display -->
-    <div id="prompter-view" class="hidden">
-        <!-- Prompter content area -->
+    <!-- One screen: the prompter is also the editor (paste and edit right in it) -->
+    <div id="main">
         <div id="prompter-container">
-            <div id="prompter-content"></div>
+            <div id="prompter-content" contenteditable="true" spellcheck="false">
+                <p>Paste your script here...</p>
+            </div>
             <div id="countdown-overlay" class="hidden"></div>
             <div id="keyboard-hints" class="hidden">
                 <h3>Keyboard Shortcuts</h3>
@@ -57,20 +32,34 @@
                 <div class="hint-row"><span class="hint-key"><kbd>,</kbd> <kbd>.</kbd></span> <span>Nudge back/forward one line</span></div>
                 <div class="hint-row"><span class="hint-key"><kbd>[</kbd> <kbd>]</kbd></span> <span>Opacity -/+</span></div>
                 <div class="hint-row"><span class="hint-key"><kbd>?</kbd></span> <span>Toggle this help</span></div>
-                <div class="hint-row"><span class="hint-key"><kbd>Esc</kbd></span> <span>Back to editor</span></div>
             </div>
             <div id="progress-bar"><div id="progress-fill"></div></div>
         </div>
 
-        <!-- Settings bar (font, size, colors, etc.) — wraps when window is narrow -->
-        <div id="control-bar">
-            <button id="btn-toggle-controls" title="Show/hide controls">&#x25B2;</button>
-            <div id="control-bar-controls">
-                <div class="control-group">
-                    <button id="btn-back" title="Back to editor">&#9664; Edit</button>
-                </div>
+        <!-- Right panel: Script (load/import) and Display (appearance) tabs -->
+        <div id="side-panel">
+            <div id="panel-tabs">
+                <button class="tab-btn active" data-tab="script">Script</button>
+                <button class="tab-btn" data-tab="display">Display</button>
+            </div>
 
-                <div class="control-group">
+            <div id="tab-script" class="tab-page">
+                <button id="btn-gdoc" class="full-width" title="Import from Google Docs">Import Google Doc</button>
+                <span id="gdoc-linked-badge" class="gdoc-badge hidden" title="Click to refresh · Right-click to unlink">🔗 Linked</span>
+                <button id="btn-demo" class="full-width" title="Load a sample script">Demo Script</button>
+                <button id="btn-clear" class="full-width" title="Clear all text">Clear</button>
+                <p class="side-hint">
+                    Or paste your script straight into the prompter. Extra blank paragraphs
+                    are removed automatically. You can edit the text any time it's paused.
+                </p>
+                <p class="side-hint">
+                    <em>Italics</em> = riff sections.<br>
+                    [Bracketed text] = stage directions (not spoken).
+                </p>
+            </div>
+
+            <div id="tab-display" class="tab-page hidden">
+                <div class="setting">
                     <label>Font</label>
                     <select id="ctrl-font">
                         <option value="Arial, sans-serif">Arial</option>
@@ -84,77 +73,54 @@
                     </select>
                 </div>
 
-                <div class="control-group">
-                    <label>Size</label>
+                <div class="setting">
+                    <label>Size <span id="font-size-val">40</span></label>
                     <input type="range" id="ctrl-font-size" min="8" max="96" value="40">
-                    <input type="number" id="font-size-val" min="8" max="96" value="40" class="spinner">
                 </div>
 
-                <div class="control-group">
-                    <label>Spacing</label>
+                <div class="setting">
+                    <label>Spacing <span id="line-height-val">1.6</span></label>
                     <input type="range" id="ctrl-line-height" min="100" max="300" value="160">
-                    <input type="number" id="line-height-val" min="100" max="300" value="160" class="spinner">
                 </div>
 
-                <div class="control-group">
-                    <label>Width</label>
+                <div class="setting">
+                    <label>Width <span id="width-val">70</span></label>
                     <input type="range" id="ctrl-width" min="30" max="100" value="70">
-                    <input type="number" id="width-val" min="30" max="100" value="70" class="spinner">
                 </div>
 
-                <div class="control-group">
-                    <label>Text</label>
-                    <input type="color" id="ctrl-text-color" value="#ffffff">
-                </div>
-
-                <div class="control-group">
-                    <label>BG</label>
-                    <input type="color" id="ctrl-bg-color" value="#000000">
-                </div>
-
-                <div class="control-group">
-                    <label>Speed</label>
+                <div class="setting">
+                    <label>Speed <span id="speed-val">30</span></label>
                     <input type="range" id="ctrl-speed" min="0" max="100" value="30">
-                    <input type="number" id="speed-val" min="0" max="100" value="30" class="spinner">
                 </div>
 
-                <div class="control-group">
+                <div class="setting setting-colors">
+                    <div class="color-item">
+                        <label>Text</label>
+                        <input type="color" id="ctrl-text-color" value="#ffffff">
+                    </div>
+                    <div class="color-item">
+                        <label>Background</label>
+                        <input type="color" id="ctrl-bg-color" value="#000000">
+                    </div>
+                </div>
+
+                <div class="setting setting-buttons">
                     <button id="btn-mirror" title="Mirror/flip text horizontally">Mirror</button>
-                </div>
-
-                <div class="control-group">
-                    <label>Opacity</label>
-                    <input type="range" id="ctrl-opacity" min="10" max="100" value="100">
-                    <input type="number" id="opacity-val" min="10" max="100" value="100" class="spinner">
-                </div>
-
-                <div class="control-group">
-                    <button id="btn-fullscreen" title="Toggle fullscreen">&#x26F6; Fullscreen</button>
-                    <button id="btn-close-prompter" class="electron-only" title="Close window">&#x2715;</button>
+                    <button id="btn-fullscreen" title="Toggle fullscreen">Fullscreen</button>
                 </div>
             </div>
-        </div>
-
-        <!-- Bottom transport controls -->
-        <div id="transport-bar">
-            <div class="transport-spacer"></div>
-            <button id="btn-play-pause" class="transport-btn">&#9654; Play</button>
-            <button id="btn-reset" class="transport-btn">&#8634; Reset</button>
-            <span id="timer-display"></span>
         </div>
     </div>
 
-    <!-- Save/Load Script Modal -->
-    <div id="scripts-modal" class="modal hidden">
-        <div class="modal-content">
-            <h2>Saved Scripts</h2>
-            <div id="scripts-list" class="script-list">
-                <p style="color: #666; font-size: 13px;">No saved scripts yet.</p>
-            </div>
-            <div class="modal-actions">
-                <button id="btn-close-scripts">Close</button>
-            </div>
-        </div>
+    <!-- Bottom bar: transport on the left, opacity underneath the app on the right -->
+    <div id="bottom-bar">
+        <button id="btn-play-pause" class="transport-btn">&#9654; Play</button>
+        <button id="btn-reset" class="transport-btn">&#8634; Reset</button>
+        <span id="timer-display"></span>
+        <span class="bottom-spacer"></span>
+        <label for="ctrl-opacity" id="opacity-label">Opacity</label>
+        <input type="range" id="ctrl-opacity" min="10" max="100" value="100">
+        <span id="opacity-val">100%</span>
     </div>
 
     <!-- Google Doc Import Modal -->
@@ -168,6 +134,28 @@
             <div class="modal-actions">
                 <button id="btn-gdoc-cancel">Cancel</button>
                 <button id="btn-gdoc-import" class="primary">Import</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- First-run welcome: quick lesson shown once on first open -->
+    <div id="welcome-modal" class="modal hidden">
+        <div class="modal-content welcome-content">
+            <h2>Welcome to the Teleprompter</h2>
+            <ol class="welcome-steps">
+                <li><strong>Get your script in.</strong> Paste it straight into the big black area, or use <em>Import Google Doc</em> in the side panel (it stays synced as you edit the doc).</li>
+                <li><strong>Press <kbd>Space</kbd> (or Play) to start scrolling.</strong> A 3-2-1 countdown runs, then read the line at the blue guide line.</li>
+                <li><strong>Adjust on the fly.</strong> <kbd>&uarr;</kbd>/<kbd>&darr;</kbd> change speed, <kbd>&larr;</kbd>/<kbd>&rarr;</kbd> jump back or forward, and the mouse wheel scrubs anywhere.</li>
+                <li><strong>Make it yours.</strong> The &#x2699; panel sets font, size, speed, colors, mirror, and fullscreen &mdash; your choices are remembered.</li>
+            </ol>
+            <p class="modal-hint welcome-tip">
+                Tip: <em>italics</em> in your script show up as highlighted riff sections, and [bracketed text]
+                becomes a dimmed stage direction that isn't meant to be read aloud.
+                Press <kbd>?</kbd> any time for the full list of shortcuts.
+            </p>
+            <div class="modal-actions">
+                <button id="btn-welcome-demo">Try the demo script</button>
+                <button id="btn-welcome-close" class="primary">Got it</button>
             </div>
         </div>
     </div>

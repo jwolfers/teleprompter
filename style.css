@@ -7,117 +7,20 @@
 
 html {
     height: 100%;
-    background: #1a1a2e;
+    background: #000;
 }
 
 body {
     height: 100%;
+    display: flex;
+    flex-direction: column;
     font-family: 'Segoe UI', Arial, sans-serif;
-    background: #1a1a2e;
+    background: #000;
     color: #e0e0e0;
 }
 
 .hidden {
     display: none !important;
-}
-
-/* ===== EDIT VIEW ===== */
-#edit-view {
-    max-width: 900px;
-    margin: 0 auto;
-    padding: 20px;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-}
-
-.edit-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 12px;
-}
-
-.edit-header h1 {
-    font-size: 24px;
-    font-weight: 300;
-    color: #fff;
-}
-
-.edit-actions {
-    display: flex;
-    gap: 8px;
-}
-
-.clean-paras-toggle {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 13px;
-    color: #aaa;
-    cursor: pointer;
-    user-select: none;
-    white-space: nowrap;
-}
-
-.clean-paras-toggle input {
-    accent-color: #4a6fa5;
-    cursor: pointer;
-}
-
-.edit-instructions {
-    font-size: 13px;
-    color: #888;
-    margin-bottom: 12px;
-    line-height: 1.5;
-}
-
-.edit-instructions em {
-    color: #f0c040;
-    font-style: italic;
-}
-
-.bracket-example {
-    color: #888;
-    background: #2a2a3e;
-    padding: 1px 4px;
-    border-radius: 3px;
-    font-size: 12px;
-}
-
-/* Rich text editor */
-#editor {
-    flex: 1;
-    background: #ffffff;
-    border: 1px solid #333;
-    border-radius: 8px;
-    padding: 24px;
-    font-size: 16px;
-    line-height: 1.7;
-    color: #222;
-    overflow-y: auto;
-    outline: none;
-    cursor: text;
-    transition: background 0.3s, color 0.3s;
-}
-
-#editor.dark-bg {
-    background: #16213e;
-    color: #e0e0e0;
-}
-
-#editor:focus {
-    border-color: #4a6fa5;
-}
-
-#editor p {
-    margin-bottom: 0.5em;
-}
-
-#editor [style*="font-style: italic"],
-#editor i,
-#editor em {
-    color: #f0c040;
 }
 
 /* ===== BUTTONS ===== */
@@ -147,124 +50,23 @@ button.primary:hover {
     background: #5a8fc5;
 }
 
-/* ===== PROMPTER VIEW ===== */
-#prompter-view {
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    background: #000;
+button.full-width {
+    width: 100%;
 }
 
-/* Settings bar (sits at the bottom, above the transport bar) */
-#control-bar {
-    display: flex;
-    align-items: flex-start;
-    padding: 0;
-    background: #111;
-    border-top: 1px solid #333;
-    z-index: 10;
-    transition: opacity 0.3s;
-}
-
-#btn-toggle-controls {
-    background: none;
-    border: none;
-    color: #888;
-    font-size: 14px;
-    padding: 6px 10px;
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: transform 0.2s;
-}
-#btn-toggle-controls:hover {
-    color: #fff;
-}
-#btn-toggle-controls.collapsed {
-    transform: rotate(-90deg);
-}
-
-#control-bar-controls {
-    display: flex;
+/* ===== MAIN LAYOUT: prompter + right panel ===== */
+#main {
     flex: 1;
-    align-items: center;
-    gap: 12px;
-    padding: 6px 8px;
-    flex-wrap: wrap;
-    overflow: hidden;
-    transition: max-height 0.3s, opacity 0.3s, padding 0.3s;
-    max-height: 320px;
-}
-#control-bar-controls.collapsed {
-    max-height: 0;
-    opacity: 0;
-    padding: 0 8px;
-}
-
-#control-bar label {
-    font-size: 11px;
-    color: #888;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.control-group {
+    min-height: 0;
     display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
 }
 
-.control-group select {
-    background: #222;
-    color: #ddd;
-    border: 1px solid #444;
-    border-radius: 4px;
-    padding: 4px 8px;
-    font-size: 12px;
-}
-
-.control-group input[type="range"] {
-    width: 60px;
-    accent-color: #4a6fa5;
-}
-
-.control-group input[type="color"] {
-    width: 28px;
-    height: 28px;
-    border: 1px solid #444;
-    border-radius: 4px;
-    padding: 0;
-    cursor: pointer;
-    background: none;
-}
-
-.control-group input.spinner {
-    width: 50px;
-    background: #222;
-    color: #ddd;
-    border: 1px solid #444;
-    border-radius: 4px;
-    padding: 2px 4px;
-    font-size: 11px;
-    text-align: center;
-}
-
-.control-group input.spinner::-webkit-inner-spin-button,
-.control-group input.spinner::-webkit-outer-spin-button {
-    opacity: 1;
-}
-
-.control-group span {
-    font-size: 11px;
-    color: #888;
-    min-width: 30px;
-}
-
-/* Prompter content area */
+/* Prompter content area (also the editor when paused) */
 #prompter-container {
     flex: 1;
     overflow: hidden;
     position: relative;
+    background: #000;
 }
 
 #prompter-content {
@@ -276,9 +78,9 @@ button.primary:hover {
     color: #fff;
     font-size: 40px;
     line-height: 1.6;
-    /* Start with content below the visible area */
     top: 100%;
     outline: none;
+    min-height: 1em;
 }
 
 #prompter-content[contenteditable="true"] {
@@ -287,6 +89,7 @@ button.primary:hover {
 
 #prompter-content[contenteditable="false"] {
     cursor: default;
+    user-select: none;
 }
 
 #prompter-content.mirrored {
@@ -346,15 +149,214 @@ button.primary:hover {
     box-shadow: 0 0 8px rgba(74, 111, 165, 0.3);
 }
 
-/* Transport bar */
-#transport-bar {
+/* ===== RIGHT PANEL (tabs: Script | Display) ===== */
+#side-panel {
+    width: 232px;
+    flex-shrink: 0;
+    background: #111;
+    border-left: 1px solid #333;
+    padding: 40px 14px 14px;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    z-index: 10;
+}
+
+#side-panel.collapsed {
+    display: none;
+}
+
+#panel-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid #333;
+    padding-bottom: 8px;
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 6px 4px;
+    font-size: 12px;
+    background: none;
+    border: 1px solid transparent;
+    color: #888;
+}
+
+.tab-btn:hover {
+    background: #2a2a3e;
+}
+
+.tab-btn.active {
+    background: #2a2a3e;
+    border-color: #444;
+    color: #fff;
+}
+
+.tab-page {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.side-hint {
+    font-size: 12px;
+    color: #888;
+    line-height: 1.5;
+}
+
+.side-hint em {
+    color: #f0c040;
+}
+
+.gdoc-badge {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    padding: 4px 10px;
+    font-size: 12px;
+    color: #8f8;
+    background: rgba(80, 200, 80, 0.12);
+    border: 1px solid rgba(80, 200, 80, 0.3);
+    border-radius: 12px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.3s, color 0.3s;
+}
+
+.gdoc-badge:hover {
+    background: rgba(80, 200, 80, 0.25);
+}
+
+.gdoc-badge.gdoc-synced {
+    color: #fff;
+    background: rgba(80, 200, 80, 0.4);
+}
+
+/* Display tab settings */
+.setting label {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 11px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+}
+
+.setting label span {
+    color: #ddd;
+    font-size: 12px;
+    font-family: monospace;
+    text-transform: none;
+}
+
+.setting input[type="range"] {
+    width: 100%;
+    accent-color: #4a6fa5;
+}
+
+.setting select {
+    width: 100%;
+    background: #222;
+    color: #ddd;
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-size: 12px;
+}
+
+.setting-colors {
+    display: flex;
+    gap: 12px;
+}
+
+.setting-colors .color-item {
+    flex: 1;
+}
+
+.setting input[type="color"] {
+    width: 100%;
+    height: 30px;
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 0;
+    cursor: pointer;
+    background: none;
+}
+
+.setting-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.setting-buttons button {
+    flex: 1;
+    padding: 8px 4px;
+    font-size: 12px;
+}
+
+/* ===== TOP FLOATING BUTTONS ===== */
+#btn-toggle-settings {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    background: rgba(42, 42, 62, 0.85);
+    border: 1px solid #444;
+    border-radius: 6px;
+    z-index: 3000;
+    -webkit-app-region: no-drag;
+}
+
+body.is-electron #btn-toggle-settings {
+    right: 48px;
+}
+
+#btn-close-app {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    width: 30px;
+    height: 30px;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: #e74c3c;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    z-index: 3000;
+    -webkit-app-region: no-drag;
+}
+
+#btn-close-app:hover {
+    background: #c0392b;
+}
+
+/* ===== BOTTOM BAR: transport + opacity ===== */
+#bottom-bar {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 10px 16px;
+    padding: 8px 14px;
     background: #111;
     border-top: 1px solid #333;
     z-index: 10;
+    -webkit-app-region: drag;
+}
+
+#bottom-bar button, #bottom-bar input {
+    -webkit-app-region: no-drag;
 }
 
 .transport-btn {
@@ -362,30 +364,59 @@ button.primary:hover {
     font-size: 14px;
 }
 
-.transport-spacer {
+.bottom-spacer {
     flex: 1;
 }
 
+#opacity-label {
+    font-size: 11px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+#bottom-bar input[type="range"] {
+    width: 140px;
+    accent-color: #4a6fa5;
+}
+
+#opacity-val {
+    font-size: 11px;
+    color: #ddd;
+    font-family: monospace;
+    min-width: 34px;
+}
+
+/* Timer display */
+#timer-display {
+    font-size: 11px;
+    color: #888;
+    font-family: monospace;
+    margin-left: 8px;
+    white-space: nowrap;
+}
+
 /* ===== FULLSCREEN ADJUSTMENTS ===== */
-:fullscreen #control-bar,
-:-webkit-full-screen #control-bar {
+:fullscreen #side-panel,
+:-webkit-full-screen #side-panel {
     opacity: 0;
     transition: opacity 0.3s;
 }
 
-:fullscreen #control-bar:hover,
-:-webkit-full-screen #control-bar:hover {
+:fullscreen #side-panel:hover,
+:-webkit-full-screen #side-panel:hover {
     opacity: 1;
 }
 
-:fullscreen #transport-bar,
-:-webkit-full-screen #transport-bar {
+:fullscreen #bottom-bar,
+:-webkit-full-screen #bottom-bar {
     opacity: 0;
     transition: opacity 0.3s;
 }
 
-:fullscreen #transport-bar:hover,
-:-webkit-full-screen #transport-bar:hover {
+:fullscreen #bottom-bar:hover,
+:-webkit-full-screen #bottom-bar:hover {
     opacity: 1;
 }
 
@@ -407,7 +438,7 @@ button.primary:hover {
     background: #555;
 }
 
-/* API Keys Modal */
+/* Modal (Google Doc import) */
 .modal {
     position: fixed;
     top: 0;
@@ -450,7 +481,6 @@ button.primary:hover {
     color: #666;
 }
 
-.modal-content input[type="password"],
 .modal-content input[type="text"] {
     width: 100%;
     padding: 8px 12px;
@@ -469,6 +499,46 @@ button.primary:hover {
     margin-top: 16px;
 }
 
+/* First-run welcome modal */
+.welcome-content {
+    width: 520px;
+}
+
+.welcome-steps {
+    margin: 16px 0 0 20px;
+    font-size: 13px;
+    color: #ccc;
+    line-height: 1.55;
+}
+
+.welcome-steps li {
+    margin-bottom: 10px;
+}
+
+.welcome-steps strong {
+    color: #fff;
+}
+
+.welcome-tip {
+    margin-top: 8px;
+    line-height: 1.5;
+}
+
+.welcome-tip em {
+    color: #f0c040;
+}
+
+.welcome-content kbd {
+    display: inline-block;
+    background: #333;
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 0 5px;
+    font-family: monospace;
+    font-size: 11px;
+    color: #fff;
+}
+
 /* Progress bar */
 #progress-bar {
     position: absolute;
@@ -485,15 +555,6 @@ button.primary:hover {
     width: 0%;
     background: linear-gradient(to right, #4a6fa5, #5a8fc5);
     transition: width 0.3s ease;
-}
-
-/* Timer display */
-#timer-display {
-    font-size: 11px;
-    color: #888;
-    font-family: monospace;
-    margin-left: 8px;
-    white-space: nowrap;
 }
 
 /* Countdown overlay */
@@ -574,116 +635,36 @@ button.primary:hover {
     text-align: right;
 }
 
-/* Save/load scripts */
-.script-list {
-    max-height: 200px;
-    overflow-y: auto;
-    margin: 8px 0;
-}
-
-.script-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 6px 8px;
-    border: 1px solid #333;
-    border-radius: 4px;
-    margin-bottom: 4px;
-    font-size: 13px;
-    cursor: pointer;
-    transition: background 0.2s;
-}
-
-.script-item:hover {
-    background: #2a2a3e;
-}
-
-.script-item .script-name {
-    flex: 1;
-    color: #ddd;
-}
-
-.script-item .script-date {
-    font-size: 11px;
-    color: #666;
-    margin: 0 8px;
-}
-
-.script-item .script-delete {
-    color: #888;
-    cursor: pointer;
-    font-size: 16px;
-    padding: 0 4px;
-}
-
-.script-item .script-delete:hover {
-    color: #e74c3c;
-}
-
-/* Google Doc linked badge */
-.gdoc-badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 4px 10px;
-    font-size: 12px;
-    color: #8f8;
-    background: rgba(80, 200, 80, 0.12);
-    border: 1px solid rgba(80, 200, 80, 0.3);
-    border-radius: 12px;
-    cursor: pointer;
-    user-select: none;
-    transition: background 0.3s, color 0.3s;
-}
-
-.gdoc-badge:hover {
-    background: rgba(80, 200, 80, 0.25);
-}
-
-.gdoc-badge.gdoc-synced {
-    color: #fff;
-    background: rgba(80, 200, 80, 0.4);
-}
-
 /* Electron-only elements (hidden in browser, shown in Electron) */
 .electron-only {
     display: none;
 }
-.electron-show {
-    display: inline-block !important;
-    background: #e74c3c;
-    color: #fff;
-    border: none;
-    padding: 4px 10px;
-    font-size: 14px;
-    border-radius: 4px;
-    cursor: pointer;
-    margin-left: auto;
-}
-.electron-show:hover {
-    background: #c0392b;
+
+body.is-electron #drag-bar {
+    display: block;
 }
 
-/* Electron frameless window drag regions */
-.edit-header, #control-bar, #drag-bar {
-    -webkit-app-region: drag;
+body.is-electron #btn-close-app {
+    display: flex;
 }
 
+/* Electron frameless window drag region: thin strip at the very top */
 #drag-bar {
-    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
     height: 8px;
     width: 100%;
     cursor: move;
-}
-.edit-header button, .edit-header select, .edit-header input, .edit-header label,
-#control-bar button, #control-bar select, #control-bar input {
-    -webkit-app-region: no-drag;
+    z-index: 2500;
+    -webkit-app-region: drag;
 }
 
 /* Version stamp */
 #version-stamp {
     position: fixed;
-    bottom: 4px;
-    right: 8px;
+    bottom: 48px;
+    left: 8px;
     font-size: 10px;
     color: rgba(255, 255, 255, 0.15);
     font-family: monospace;
