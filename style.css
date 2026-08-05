@@ -393,11 +393,23 @@ body.is-electron #btn-toggle-settings {
 
 /* Timer display */
 #timer-display {
-    font-size: 11px;
-    color: #888;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
     font-family: monospace;
-    margin-left: 8px;
+    margin-left: 12px;
     white-space: nowrap;
+}
+
+#timer-display .timer-elapsed {
+    font-size: 20px;
+    font-weight: 700;
+    color: #fff;
+}
+
+#timer-display .timer-ends {
+    font-size: 13px;
+    color: #9fc0e8;
 }
 
 /* ===== FULLSCREEN ADJUSTMENTS ===== */

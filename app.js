@@ -502,16 +502,23 @@ function updateTimerDisplay() {
     const elapsed = Math.floor((Date.now() - state.prompterStartTime) / 1000);
     const elapsedStr = formatTime(elapsed);
 
-    // Estimate remaining based on scroll progress
+    // Estimate the finish from the scroll distance left at the current speed
     const containerHeight = prompterContainer.offsetHeight;
     const contentHeight = prompterContent.scrollHeight;
     const maxScroll = (containerHeight * 0.7) + contentHeight;
-    const progress = Math.max(0.01, state.scrollPosition / maxScroll);
-    const totalEstimate = elapsed / progress;
-    const remaining = Math.max(0, Math.round(totalEstimate - elapsed));
-    const remainStr = formatTime(remaining);
+    const remainingPx = Math.max(0, maxScroll - state.scrollPosition);
 
-    timerDisplay.textContent = `${elapsedStr} / -${remainStr}`;
+    let endsStr = '';
+    if (state.speed > 0) {
+        const remainingSec = remainingPx / state.speed;
+        const finishAt = new Date(Date.now() + remainingSec * 1000);
+        const clock = finishAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        endsStr = `${formatTime(Math.round(remainingSec))} left · ends ${clock}`;
+    }
+
+    timerDisplay.innerHTML =
+        `<span class="timer-elapsed">${elapsedStr}</span>` +
+        (endsStr ? `<span class="timer-ends">${endsStr}</span>` : '');
 }
 
 function formatTime(seconds) {
