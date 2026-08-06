@@ -1,7 +1,9 @@
 // ===== STATE =====
 const state = {
     playing: false,
-    speed: 30,              // pixels per second
+    wpm: 150,               // reading speed in words per minute (the user-facing setting)
+    speed: 30,              // scroll speed in pixels per second, derived from wpm
+    wordCount: 0,           // words in the current script, for the wpm→px/s conversion
     scrollPosition: 0,
     mirrored: false,
     panelWidth: 232,        // side panel width in px
@@ -88,6 +90,7 @@ function setScript(html, { keepScroll = false } = {}) {
     state.editedScript = html;
     prompterContent.innerHTML = processContentForDisplay(html);
     state.paragraphs = parseParagraphs();
+    updateWordCount();
     if (keepScroll) {
         positionContent();
     } else {
@@ -275,7 +278,34 @@ prompterContent.addEventListener('paste', (e) => {
 // Track typed edits (no rebuild — that would move the cursor)
 prompterContent.addEventListener('input', () => {
     state.editedScript = reverseProcessContent(prompterContent.innerHTML);
+    updateWordCount();
 });
+
+
+// ===== SPEED (words per minute → pixels per second) =====
+
+function updateWordCount() {
+    const text = hasScript() ? prompterContent.textContent.trim() : '';
+    state.wordCount = text ? text.split(/\s+/).length : 0;
+}
+
+// Convert the wpm setting to a scroll speed, using how densely the current
+// script lays out words on screen (so font size, spacing, and width changes
+// keep the same reading pace)
+function wpmToPxPerSec() {
+    const fontSize = parseInt(ctrlFontSize.value);
+    const lineHeightPx = fontSize * (parseInt(ctrlLineHeight.value) / 100);
+    let pxPerWord;
+    if (state.wordCount >= 20) {
+        pxPerWord = prompterContent.scrollHeight / state.wordCount;
+    } else {
+        // No script yet: estimate from font metrics (an average word ≈ 3× font size wide)
+        const lineWidth = prompterContent.offsetWidth || 600;
+        const wordsPerLine = Math.max(1, lineWidth / (fontSize * 3));
+        pxPerWord = lineHeightPx / wordsPerLine;
+    }
+    return (state.wpm / 60) * pxPerWord;
+}
 
 
 // ===== SETTINGS =====
@@ -301,13 +331,14 @@ function applySettings() {
     $('#bottom-bar').style.background = barBg;
     document.documentElement.style.setProperty('--panel-bg', barBg);
 
-    state.speed = parseInt(ctrlSpeed.value);
+    state.wpm = parseInt(ctrlSpeed.value);
+    state.speed = wpmToPxPerSec();
 
     // Update value labels next to the sliders
     fontSizeVal.textContent = ctrlFontSize.value + 'px';
     widthVal.textContent = ctrlWidth.value + '%';
     lineHeightVal.textContent = (ctrlLineHeight.value / 100).toFixed(1) + '×';
-    speedVal.textContent = ctrlSpeed.value + ' px/s';
+    speedVal.textContent = ctrlSpeed.value + ' wpm';
     opacityVal.textContent = ctrlOpacity.value + '%';
 
     updateDayNightUI();
@@ -326,7 +357,7 @@ function saveSettings() {
         lineHeight: ctrlLineHeight.value,
         textColor: ctrlTextColor.value,
         bgColor: ctrlBgColor.value,
-        speed: ctrlSpeed.value,
+        wpm: ctrlSpeed.value,
         opacity: ctrlOpacity.value,
         mirrored: state.mirrored,
         panelWidth: state.panelWidth,
@@ -348,7 +379,8 @@ function loadSettings() {
     if (saved.lineHeight) ctrlLineHeight.value = saved.lineHeight;
     if (saved.textColor) ctrlTextColor.value = saved.textColor;
     if (saved.bgColor) ctrlBgColor.value = saved.bgColor;
-    if (saved.speed) ctrlSpeed.value = saved.speed;
+    // Note: pre-wpm versions saved `speed` in px/s — not comparable, so ignored
+    if (saved.wpm) ctrlSpeed.value = saved.wpm;
     if (saved.opacity) ctrlOpacity.value = saved.opacity;
     if (saved.mirrored) toggleMirror();
     if (saved.panelWidth) {
@@ -384,7 +416,8 @@ function bgLuminance() {
 function updateDayNightUI() {
     const day = bgLuminance() > 128;
     document.body.classList.toggle('light-bg', day);
-    btnDayNight.textContent = day ? '🌙 Night mode' : '☀️ Day mode';
+    btnDayNight.textContent = day ? '🌙' : '☀️';
+    btnDayNight.title = day ? 'Switch to night mode (light text on dark)' : 'Switch to day mode (dark text on light)';
 }
 
 btnDayNight.addEventListener('click', () => {
@@ -458,6 +491,8 @@ function animate(timestamp) {
     const delta = (timestamp - state.lastTimestamp) / 1000;
     state.lastTimestamp = timestamp;
 
+    // Re-derive px/s each frame so window resizes keep the same wpm
+    state.speed = wpmToPxPerSec();
     state.scrollPosition += state.speed * delta;
 
     const containerHeight = prompterContainer.offsetHeight;
@@ -1042,12 +1077,12 @@ document.addEventListener('keydown', (e) => {
             break;
         case 'ArrowUp':
             e.preventDefault();
-            ctrlSpeed.value = Math.min(100, parseInt(ctrlSpeed.value) + 5);
+            ctrlSpeed.value = Math.min(parseInt(ctrlSpeed.max), parseInt(ctrlSpeed.value) + 10);
             applySettings();
             break;
         case 'ArrowDown':
             e.preventDefault();
-            ctrlSpeed.value = Math.max(0, parseInt(ctrlSpeed.value) - 5);
+            ctrlSpeed.value = Math.max(parseInt(ctrlSpeed.min), parseInt(ctrlSpeed.value) - 10);
             applySettings();
             break;
         case 'ArrowLeft':
@@ -1096,6 +1131,7 @@ document.addEventListener('keydown', (e) => {
             break;
         case 'Escape':
             keyboardHints.classList.add('hidden');
+            helpModal.classList.add('hidden');
             if (!welcomeModal.classList.contains('hidden')) dismissWelcome();
             break;
     }
@@ -1112,6 +1148,7 @@ btnMirror.addEventListener('click', toggleMirror);
 btnClear.addEventListener('click', () => {
     prompterContent.innerHTML = '<p><br></p>';
     state.editedScript = '';
+    updateWordCount();
     resetScroll();
     prompterContent.focus();
 });
@@ -1212,10 +1249,29 @@ function maybeShowWelcome() {
 }
 
 
+// ===== HELP MODAL =====
+
+const helpModal = $('#help-modal');
+
+$('#btn-help').addEventListener('click', () => {
+    helpModal.classList.remove('hidden');
+});
+
+$('#btn-help-close').addEventListener('click', () => {
+    helpModal.classList.add('hidden');
+});
+
+helpModal.addEventListener('click', (e) => {
+    if (e.target === helpModal) helpModal.classList.add('hidden');
+});
+
+
 // ===== INIT =====
 
-// Restore saved preferences from the previous session
+// Restore saved preferences from the previous session, then apply them
+// (loadSettings skips applySettings when nothing is saved yet)
 loadSettings();
+applySettings();
 
 // Show the quick lesson on the very first open
 maybeShowWelcome();
@@ -1224,5 +1280,5 @@ maybeShowWelcome();
 requestAnimationFrame(positionContent);
 
 // Version stamp
-const VERSION_TIMESTAMP = '2026-08-05 v9 — first-run welcome';
+const VERSION_TIMESTAMP = '2026-08-05 v10 — wpm speed + display settings menu';
 document.getElementById('version-stamp').textContent = VERSION_TIMESTAMP;

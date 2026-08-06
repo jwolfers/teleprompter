@@ -290,6 +290,20 @@ body.resizing-panel {
     flex: 1;
 }
 
+/* Compact day/night toggle sits level with the color swatches */
+.setting-colors .color-item-daynight {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: flex-end;
+}
+
+#btn-daynight {
+    height: 30px;
+    padding: 0 8px;
+    font-size: 15px;
+    line-height: 1;
+}
+
 .setting input[type="color"] {
     width: 100%;
     height: 30px;
@@ -298,6 +312,54 @@ body.resizing-panel {
     padding: 0;
     cursor: pointer;
     background: none;
+}
+
+/* Collapsible display-settings menu (closed by default) */
+.settings-menu {
+    border: 1px solid #333;
+    border-radius: 6px;
+}
+
+.settings-menu summary {
+    padding: 8px 10px;
+    cursor: pointer;
+    font-size: 11px;
+    color: #aaa;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    user-select: none;
+    list-style: none;
+}
+
+.settings-menu summary::-webkit-details-marker {
+    display: none;
+}
+
+.settings-menu summary::before {
+    content: '\25B8';
+    display: inline-block;
+    margin-right: 6px;
+    color: #666;
+    transition: transform 0.15s;
+}
+
+.settings-menu[open] summary::before {
+    transform: rotate(90deg);
+}
+
+.settings-menu summary:hover {
+    color: #fff;
+}
+
+.settings-menu[open] summary {
+    border-bottom: 1px solid #333;
+}
+
+.settings-menu-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px 10px;
 }
 
 .setting-buttons {
@@ -332,6 +394,29 @@ body.resizing-panel {
 
 body.is-electron #btn-toggle-settings {
     right: 48px;
+}
+
+#btn-help {
+    position: fixed;
+    top: 10px;
+    right: 48px;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 600;
+    background: rgba(42, 42, 62, 0.85);
+    border: 1px solid #444;
+    border-radius: 6px;
+    z-index: 3000;
+    -webkit-app-region: no-drag;
+}
+
+body.is-electron #btn-help {
+    right: 86px;
 }
 
 #btn-close-app {
@@ -527,6 +612,71 @@ body.is-electron #btn-toggle-settings {
     justify-content: flex-end;
     gap: 8px;
     margin-top: 16px;
+}
+
+/* Help modal: full instructions + FAQ */
+.help-content {
+    width: 640px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.help-body {
+    overflow-y: auto;
+    padding-right: 12px;
+    font-size: 13px;
+    color: #ccc;
+    line-height: 1.55;
+}
+
+.help-body h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    margin: 16px 0 6px;
+}
+
+.help-body h3:first-child {
+    margin-top: 0;
+}
+
+.help-body p {
+    margin-bottom: 8px;
+}
+
+.help-body ul {
+    margin: 0 0 8px 20px;
+}
+
+.help-body li {
+    margin-bottom: 6px;
+}
+
+.help-body em {
+    color: #f0c040;
+}
+
+.help-body .faq-q {
+    color: #9fc0e8;
+    font-weight: 600;
+    margin: 12px 0 2px;
+}
+
+.help-keys td {
+    padding: 2px 12px 2px 0;
+    vertical-align: top;
+}
+
+.help-body kbd {
+    display: inline-block;
+    background: #333;
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 0 5px;
+    font-family: monospace;
+    font-size: 11px;
+    color: #fff;
 }
 
 /* First-run welcome modal */

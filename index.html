@@ -13,6 +13,7 @@
     <div id="drag-bar" class="electron-only"></div>
     <button id="btn-close-app" class="electron-only" title="Close">&#x2715;</button>
     <button id="btn-toggle-settings" title="Hide panel">&raquo;</button>
+    <button id="btn-help" title="Help &amp; instructions">?</button>
 
     <!-- One screen: the prompter is also the editor (paste and edit right in it) -->
     <div id="main">
@@ -44,62 +45,63 @@
             <button id="btn-demo" class="full-width" title="Load a sample script">Demo Script</button>
             <button id="btn-clear" class="full-width" title="Clear all text">Clear</button>
             <p class="side-hint">
-                Or paste your script straight into the prompter. Extra blank paragraphs
-                are removed automatically. You can edit the text any time it's paused.
-                <em>Italics</em> = riff sections.
-                [Bracketed text] = stage directions (not spoken).
+                Or paste your script straight into the prompter.
             </p>
 
             <hr class="panel-divider">
 
             <div class="setting">
-                <label>Font</label>
-                <select id="ctrl-font">
-                    <option value="Arial, sans-serif">Arial</option>
-                    <option value="'Times New Roman', serif">Times New Roman</option>
-                    <option value="'Courier New', monospace">Courier New</option>
-                    <option value="Georgia, serif">Georgia</option>
-                    <option value="Verdana, sans-serif">Verdana</option>
-                    <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
-                    <option value="Palatino, serif">Palatino</option>
-                    <option value="'Segoe UI', sans-serif">Segoe UI</option>
-                </select>
+                <label>Speed <span id="speed-val">150 wpm</span></label>
+                <input type="range" id="ctrl-speed" min="50" max="300" value="150">
             </div>
 
-            <div class="setting">
-                <label>Size <span id="font-size-val">40px</span></label>
-                <input type="range" id="ctrl-font-size" min="8" max="96" value="40">
-            </div>
+            <details class="settings-menu" id="display-settings">
+                <summary>Display settings</summary>
+                <div class="settings-menu-body">
+                    <div class="setting">
+                        <label>Font</label>
+                        <select id="ctrl-font">
+                            <option value="Arial, sans-serif">Arial</option>
+                            <option value="'Times New Roman', serif">Times New Roman</option>
+                            <option value="'Courier New', monospace">Courier New</option>
+                            <option value="Georgia, serif">Georgia</option>
+                            <option value="Verdana, sans-serif">Verdana</option>
+                            <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+                            <option value="Palatino, serif">Palatino</option>
+                            <option value="'Segoe UI', sans-serif">Segoe UI</option>
+                        </select>
+                    </div>
 
-            <div class="setting">
-                <label>Spacing <span id="line-height-val">1.6&times;</span></label>
-                <input type="range" id="ctrl-line-height" min="100" max="300" value="160">
-            </div>
+                    <div class="setting">
+                        <label>Size <span id="font-size-val">40px</span></label>
+                        <input type="range" id="ctrl-font-size" min="8" max="96" value="40">
+                    </div>
 
-            <div class="setting">
-                <label>Width <span id="width-val">70%</span></label>
-                <input type="range" id="ctrl-width" min="30" max="100" value="70">
-            </div>
+                    <div class="setting">
+                        <label>Spacing <span id="line-height-val">1.6&times;</span></label>
+                        <input type="range" id="ctrl-line-height" min="100" max="300" value="160">
+                    </div>
 
-            <div class="setting">
-                <label>Speed <span id="speed-val">30 px/s</span></label>
-                <input type="range" id="ctrl-speed" min="0" max="100" value="30">
-            </div>
+                    <div class="setting">
+                        <label>Width <span id="width-val">70%</span></label>
+                        <input type="range" id="ctrl-width" min="30" max="100" value="70">
+                    </div>
 
-            <div class="setting setting-colors">
-                <div class="color-item">
-                    <label>Text</label>
-                    <input type="color" id="ctrl-text-color" value="#ffffff">
+                    <div class="setting setting-colors">
+                        <div class="color-item">
+                            <label>Text</label>
+                            <input type="color" id="ctrl-text-color" value="#ffffff">
+                        </div>
+                        <div class="color-item">
+                            <label>Background</label>
+                            <input type="color" id="ctrl-bg-color" value="#000000">
+                        </div>
+                        <div class="color-item color-item-daynight">
+                            <button id="btn-daynight" title="Swap between dark and light prompter colors">&#x2600;&#xFE0F;</button>
+                        </div>
+                    </div>
                 </div>
-                <div class="color-item">
-                    <label>Background</label>
-                    <input type="color" id="ctrl-bg-color" value="#000000">
-                </div>
-            </div>
-
-            <div class="setting setting-buttons">
-                <button id="btn-daynight" title="Swap between dark and light prompter colors">&#x2600;&#xFE0F; Day mode</button>
-            </div>
+            </details>
 
             <div class="setting setting-buttons">
                 <button id="btn-mirror" title="Mirror/flip text horizontally">Mirror</button>
@@ -142,7 +144,7 @@
                 <li><strong>Get your script in.</strong> Paste it straight into the big black area, or use <em>Import Google Doc</em> in the side panel (it stays synced as you edit the doc).</li>
                 <li><strong>Press <kbd>Space</kbd> (or Play) to start scrolling.</strong> A 3-2-1 countdown runs, then read the line at the blue guide line.</li>
                 <li><strong>Adjust on the fly.</strong> <kbd>&uarr;</kbd>/<kbd>&darr;</kbd> change speed, <kbd>&larr;</kbd>/<kbd>&rarr;</kbd> jump back or forward, and the mouse wheel scrubs anywhere.</li>
-                <li><strong>Make it yours.</strong> The side panel sets font, size, speed, colors, mirror, and fullscreen &mdash; your choices are remembered. Drag its edge to resize it, or hide it with the &raquo; button.</li>
+                <li><strong>Make it yours.</strong> The side panel sets your speed in words per minute, and its <em>Display settings</em> menu holds font, size, and colors &mdash; your choices are remembered. Drag its edge to resize it, or hide it with the &raquo; button.</li>
             </ol>
             <p class="modal-hint welcome-tip">
                 Tip: <em>italics</em> in your script show up as highlighted riff sections, and [bracketed text]
@@ -152,6 +154,118 @@
             <div class="modal-actions">
                 <button id="btn-welcome-demo">Try the demo script</button>
                 <button id="btn-welcome-close" class="primary">Got it</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help: full instructions and FAQ -->
+    <div id="help-modal" class="modal hidden">
+        <div class="modal-content help-content">
+            <h2>Teleprompter &mdash; Instructions</h2>
+            <div class="help-body">
+                <h3>What this app does</h3>
+                <p>
+                    It scrolls your script smoothly up the screen at a speed you control, so you can
+                    keep your eyes up while you speak. Everything runs on your own computer: your
+                    script and settings are stored locally and are never uploaded anywhere. The only
+                    network access is fetching a Google Doc you explicitly link.
+                </p>
+
+                <h3>Getting your script in</h3>
+                <ul>
+                    <li><strong>Paste it.</strong> Click into the big prompter area and paste. Extra blank
+                        paragraphs are stripped automatically, and you can edit the text right in the
+                        prompter any time it's paused.</li>
+                    <li><strong>Import a Google Doc.</strong> Click <em>Import Google Doc</em> and paste the
+                        doc's URL. The doc must be shared as &ldquo;Anyone with the link can view&rdquo;.
+                        The prompter then stays <em>linked</em>: it re-checks the doc every 10 seconds and
+                        picks up your edits. Click the 🔗 badge to refresh immediately; right-click it to unlink.</li>
+                    <li><strong>Demo Script</strong> loads a sample so you can try everything out.</li>
+                </ul>
+
+                <h3>Script formatting</h3>
+                <ul>
+                    <li><em>Italics</em> become highlighted <strong>riff sections</strong> &mdash; talking
+                        points to improvise around rather than read word-for-word.</li>
+                    <li><strong>[Bracketed text]</strong> becomes a dimmed <strong>stage direction</strong>
+                        (e.g. [Pause for applause]) that isn't meant to be read aloud.</li>
+                    <li>Images and charts in a Google Doc are imported and scaled to fit the column.</li>
+                </ul>
+
+                <h3>Playing and controlling</h3>
+                <p>
+                    Press <kbd>Space</kbd> or the Play button. A 3-2-1 countdown runs, then the script
+                    scrolls at your chosen speed. Read the line crossing the <strong>blue guide line</strong>;
+                    text above it dims as already-read. While playing you can adjust speed with
+                    <kbd>&uarr;</kbd>/<kbd>&darr;</kbd>, jump with <kbd>&larr;</kbd>/<kbd>&rarr;</kbd>, or
+                    scrub anywhere with the mouse wheel. Pause to edit the text; Reset returns to the top.
+                </p>
+                <p>
+                    The bottom bar shows the <strong>elapsed time</strong> since you started (in bold), the
+                    <strong>time left</strong>, and the <strong>estimated clock time you'll finish</strong>,
+                    based on the text remaining at your current speed. A thin progress bar runs along the
+                    bottom of the prompter.
+                </p>
+
+                <h3>Display settings</h3>
+                <p>
+                    The side panel sets your reading speed in words per minute, and (under
+                    <em>Display settings</em>) font, text size, line spacing, column width, and
+                    text/background colors. The ☀️/🌙 button swaps between dark and light color schemes.
+                    <strong>Mirror</strong> flips the text horizontally for beam-splitter teleprompter rigs;
+                    <strong>Fullscreen</strong> hides everything but the script (controls reappear when you
+                    hover). Drag the panel's left edge to resize it, or hide it with the &raquo; button.
+                    In the desktop app, the <strong>Opacity</strong> slider makes the whole window
+                    see-through so it can float over other apps &mdash; it always stays on top.
+                </p>
+
+                <h3>Keyboard shortcuts</h3>
+                <table class="help-keys">
+                    <tr><td><kbd>Space</kbd></td><td>Play / Pause</td></tr>
+                    <tr><td><kbd>&uarr;</kbd> <kbd>&darr;</kbd></td><td>Speed up / slow down</td></tr>
+                    <tr><td><kbd>&larr;</kbd> <kbd>&rarr;</kbd></td><td>Jump back / forward</td></tr>
+                    <tr><td><kbd>,</kbd> <kbd>.</kbd></td><td>Nudge back / forward one line</td></tr>
+                    <tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>Window opacity down / up</td></tr>
+                    <tr><td><kbd>F</kbd></td><td>Fullscreen</td></tr>
+                    <tr><td><kbd>M</kbd></td><td>Mirror</td></tr>
+                    <tr><td><kbd>R</kbd></td><td>Reset to top</td></tr>
+                    <tr><td><kbd>?</kbd></td><td>Quick shortcut overlay</td></tr>
+                </table>
+
+                <h3>FAQ</h3>
+                <p class="faq-q">Why does my Google Doc need to be shared &ldquo;Anyone with the link&rdquo;?</p>
+                <p>The app reads the doc's web export directly, without signing in to your Google account.
+                    View-only link sharing is what makes that possible. Nothing is uploaded, and no one can
+                    edit your doc through the link.</p>
+
+                <p class="faq-q">My linked doc isn't updating.</p>
+                <p>Changes are picked up within about 10 seconds. Click the 🔗 badge to force a refresh.
+                    If it still doesn't update, check that link sharing is still on, or right-click the badge
+                    to unlink and import again.</p>
+
+                <p class="faq-q">Where are my script and settings stored?</p>
+                <p>Locally, in the app's own storage on your computer. Closing and reopening the app brings
+                    everything back. Clearing the app's browsing data erases it.</p>
+
+                <p class="faq-q">Does the elapsed timer stop when I pause?</p>
+                <p>No &mdash; it shows wall-clock time since you first pressed Play, including pauses, which
+                    is what matters for a live slot. Reset clears it. The finish estimate, by contrast, only
+                    looks forward: text remaining &divide; current speed.</p>
+
+                <p class="faq-q">How do I hit an exact running time?</p>
+                <p>Do one practice pass and watch the <em>ends</em> estimate in the bottom bar &mdash; it
+                    updates instantly when you change speed, so nudge <kbd>&uarr;</kbd>/<kbd>&darr;</kbd>
+                    until the finish time matches your target.</p>
+
+                <p class="faq-q">What is Mirror for?</p>
+                <p>Professional teleprompter rigs bounce the screen off angled glass in front of the lens,
+                    which flips the image. Mirror pre-flips the text so it reads correctly in the reflection.</p>
+
+                <p class="faq-q">Does it work offline?</p>
+                <p>Yes. Everything works without a connection except Google Doc importing and syncing.</p>
+            </div>
+            <div class="modal-actions">
+                <button id="btn-help-close" class="primary">Close</button>
             </div>
         </div>
     </div>
