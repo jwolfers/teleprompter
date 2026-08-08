@@ -1,0 +1,37 @@
+name: Build Marys prompter (Mac)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm ci
+
+      - name: Build Mac app (universal binary, works on Intel and Apple Silicon)
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npx electron-builder --mac dir --universal --config mary-build.yml
+
+      - name: Ad-hoc sign so the app launches on Apple Silicon
+        run: |
+          APP=$(find dist-mary -maxdepth 2 -name "*.app" | head -1)
+          echo "Signing $APP"
+          codesign --force --deep -s - "$APP"
+
+      - name: Zip the app (ditto preserves Mac symlinks and metadata)
+        run: |
+          APP=$(find dist-mary -maxdepth 2 -name "*.app" | head -1)
+          ditto -c -k --sequesterRsrc --keepParent "$APP" "Marys-prompter-Mac.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Marys-prompter-Mac
+          path: Marys-prompter-Mac.zip

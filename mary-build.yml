@@ -1,0 +1,19 @@
+# electron-builder config for Mary's Mac copy — used by the
+# "Build Marys prompter (Mac)" GitHub Actions workflow.
+appId: com.platypustools.marysprompter
+productName: Marys prompter
+files:
+  - main.js
+  - index.html
+  - app.js
+  - style.css
+  - manifest.json
+  - favicon.svg
+  - icon.ico
+  - icon-192.png
+  - icon-512.png
+directories:
+  output: dist-mary
+mac:
+  target: dir
+  icon: icon-512.png
