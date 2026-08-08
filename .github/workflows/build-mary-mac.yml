@@ -1,7 +1,8 @@
 name: Build Marys prompter (Mac)
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [mary-mac-build]
 
 jobs:
   build:
