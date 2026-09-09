@@ -1,143 +1,136 @@
-# Teleprompter App
+# Teleprompter
 
-A web-based teleprompter with AI-powered listening mode that tracks your speech and advances automatically.
+A teleprompter that scrolls your script up the screen at a pace you control, so you can keep
+your eyes up while you speak. It runs entirely on your own machine — your script and settings
+stay local, and the only network access is fetching a Google Doc you explicitly link.
 
-## Project Status
+Runs as a desktop app (Windows/macOS), or straight from `index.html` in a browser.
 
-**In Progress** - Setting up the basic structure.
+## Features
 
-## Features (Planned)
+### Getting a script in
+- **Paste** directly into the prompter area. Blank paragraphs are stripped; you can edit in
+  place whenever playback is paused.
+- **Import a Google Doc** and stay linked to it — the prompter re-checks the doc every 10
+  seconds and picks up your edits mid-read, holding your place at the guide line. It leaves
+  the script alone when nothing has actually changed, so an untouched doc never causes a jump.
+- **Multi-tab docs** read their first tab and list the others so you can switch with one click.
+- Imported docs keep their structure: **bold**, italic, underline, headings, bullets,
+  numbering, indents, block quotes, tables, links, and images/charts.
 
-### Core Teleprompter
-- Paste text from Google Docs with full formatting preserved (bold, italic, colors, links)
-- Adjustable: font size, font family, text color, background color, screen width, line spacing
-- Manual scroll mode with adjustable speed
-- Fullscreen mode (no browser chrome)
-- PWA support (install as app)
+### Reading
+- Speed set in **words per minute**, converted to a scroll rate from how densely the current
+  script lays out on screen — so font size, spacing and width changes hold the same pace.
+- A blue **guide line** marks the line to read; text above it dims as already-read.
+- Bottom bar shows elapsed time, time remaining, and the **clock time you'll finish** at the
+  current speed. Handy for hitting an exact slot: nudge the speed until the finish time matches.
+- 3-2-1 countdown on play. Mouse wheel or touch-drag scrubs anywhere in the script.
 
-### Listening Mode (AI-Powered)
-- Uses **OpenAI GPT-4o-mini-transcribe** for speech-to-text ($0.003/min)
-- Uses **Claude 3.5 Sonnet** for semantic matching (understands context, not just words)
-- Handles speaker reordering words, tangents, and natural speech patterns
-- **Riff detection**: Text in *italics* or after "riff" signals a tangent - teleprompter waits
-- **Stage directions**: Text in [square brackets] is not spoken - displayed differently
+### Script conventions
+- *Italics* become highlighted **riff sections** — points to improvise around rather than read
+  word-for-word.
+- `[Bracketed text]` becomes a dimmed **stage direction** that isn't meant to be spoken.
 
-## Tech Stack
+### Display
+- Font, size, line spacing, column width, and text/background colours, with a ☀️/🌙 button to
+  swap between dark and light schemes. Settings are remembered between sessions.
+- **Mirror** flips the text horizontally for beam-splitter rigs.
+- **Fullscreen** hides everything but the script.
+- In the desktop app the window is frameless, always-on-top, and has an **opacity** slider so it
+  can float see-through over other apps.
 
-- Plain HTML / CSS / JavaScript (no framework)
-- No build step required
-- Just open `index.html` in a browser
+## Keyboard shortcuts
 
-## Setup Instructions
+| Key | Action |
+|-----|--------|
+| <kbd>Space</kbd> | Play / pause |
+| <kbd>↑</kbd> <kbd>↓</kbd> | Speed up / slow down |
+| <kbd>←</kbd> <kbd>→</kbd> | Jump back / forward |
+| <kbd>,</kbd> <kbd>.</kbd> | Nudge back / forward one line |
+| <kbd>[</kbd> <kbd>]</kbd> | Window opacity down / up |
+| <kbd>F</kbd> | Fullscreen |
+| <kbd>M</kbd> | Mirror |
+| <kbd>R</kbd> | Reset to top |
+| <kbd>?</kbd> | Quick shortcut overlay |
 
-### 1. Get API Keys
+Full instructions and an FAQ are in the app itself — the **?** button, top right.
 
-You'll need two API keys:
+## Running it
 
-1. **OpenAI API Key** (for speech-to-text)
-   - Go to https://platform.openai.com/api-keys
-   - Create a new secret key
-   - Copy it
+No API keys, no accounts, no build step for the web version.
 
-2. **Anthropic API Key** (for semantic matching with Claude)
-   - Go to https://console.anthropic.com/
-   - Create an API key
-   - Copy it
+**Browser:** open `index.html`. Chrome or Edge recommended.
 
-### 2. Configure API Keys
+**Desktop app (from source):**
 
-Edit `config.js` and add your keys:
-
-```javascript
-const CONFIG = {
-    OPENAI_API_KEY: 'sk-your-openai-key-here',
-    ANTHROPIC_API_KEY: 'sk-ant-your-anthropic-key-here'
-};
+```
+npm install
+npm start
 ```
 
-**Important**: Never commit `config.js` to git (it's in `.gitignore`).
+On Windows, `Start Teleprompter.bat` does both of those for you, installing Node.js first if
+it isn't present.
 
-### 3. Run the App
+**Prebuilt executable:** `Teleprompter.exe` in the repo root is a portable Windows build — copy
+it anywhere and run it, no install required. (It's gitignored; build your own with the commands
+below.)
 
-Simply open `index.html` in your browser. That's it!
+## Building
 
-For best results, use Chrome (best Web Speech API support as fallback).
+```
+npm run build:win     # portable Teleprompter.exe -> dist/
+npm run build:mac     # Teleprompter.dmg -> dist/
+npm run build         # both
+npm run icons         # regenerate icon PNGs from the SVG
+```
 
-## File Structure
+## Google Docs notes
+
+The doc must be shared as **"Anyone with the link can view"** — the app reads the doc's public
+web export directly rather than signing in to your Google account, so nothing is uploaded and
+no one can edit your doc through the link.
+
+Google's HTML export puts nearly all formatting in generated CSS class names and re-signs image
+URLs on every request, so the importer resolves the export's stylesheet before reading the
+markup, and compares a fingerprint of words and structure (not raw HTML) to decide whether
+anything really changed.
+
+Listing a doc's tabs officially requires OAuth, which this app deliberately avoids. Instead it
+scrapes candidate tab ids from the doc's own pages and confirms each by exporting it — ids that
+aren't real return the default tab and collapse away. If that finds nothing, the import falls
+back to Google's default export, which is the first tab anyway.
+
+## File structure
 
 ```
 Teleprompter/
-├── index.html      # Main app page
-├── style.css       # All styling
-├── app.js          # Main application logic
-├── config.js       # Your API keys (DO NOT COMMIT)
-├── config.example.js  # Template for config.js
-├── .gitignore      # Ignores config.js
-└── README.md       # This file
+├── index.html          # Whole UI: prompter, side panel, modals
+├── app.js              # All application logic
+├── style.css           # All styling
+├── main.js             # Electron main process (frameless, always-on-top window)
+├── manifest.json       # PWA manifest
+├── package.json        # Scripts and electron-builder config
+├── Start Teleprompter.bat   # Windows launcher (installs Node if needed)
+├── tools/              # Icon generation
+└── icon*.png, *.ico, favicon.svg
 ```
 
-## Architecture Decisions
+`config.js` / `config.example.js` are leftovers from an earlier plan for AI features and are not
+loaded by the app.
 
-1. **No framework** - Plain HTML/CSS/JS for simplicity
-2. **No build step** - Just open the HTML file
-3. **Config file for keys** - Simple, no server needed for local use
-4. **OpenAI for speech-to-text** - Best accuracy at $0.003/min (GPT-4o-mini-transcribe)
-5. **Claude for semantic matching** - Excellent at understanding context and detecting riffs
+## Architecture decisions
 
-## How Listening Mode Works
+1. **No framework, no build step** — plain HTML/CSS/JS; the browser version is just a file you open.
+2. **The prompter *is* the editor** — one `contenteditable` area, rather than a separate edit view.
+3. **Public web export instead of the Google Docs API** — avoids OAuth entirely, at the cost of
+   needing link sharing and some scraping for tabs.
+4. **Speed in words per minute** rather than pixels per second, so the setting means the same
+   thing across fonts and layouts.
+5. **Sentence anchoring on sync** — when a linked doc updates mid-read, the sentence at the
+   guide line stays put rather than the pixel offset.
 
-1. **Speech capture** → Browser microphone access
-2. **Transcription** → Audio sent to OpenAI Realtime API → text
-3. **Semantic matching** → Recent transcript + full script sent to Claude
-4. **Position update** → Claude returns current position + riff status
-5. **Scroll** → Teleprompter advances to match (or waits during riffs)
+## Not implemented
 
-## Resuming Development
-
-If you're coming back to this project with Claude Code:
-
-1. Open the Teleprompter folder in your terminal/IDE
-2. Run Claude Code
-3. Say: "Let's continue building the teleprompter. Check the README and todo list."
-
-## Current Todo List
-
-- [x] Project planning and architecture
-- [ ] Create project structure (HTML, CSS, JS, config)
-- [ ] Build rich text editor with paste formatting support
-- [ ] Create teleprompter display component
-- [ ] Add customization controls
-- [ ] Implement manual scroll mode
-- [ ] Implement speech-to-text with OpenAI
-- [ ] Implement semantic matching with Claude
-- [ ] Handle riff/italics detection and bracketed text
-- [ ] Add fullscreen mode and PWA support
-
-## Browser Support
-
-- **Chrome** (recommended) - Best microphone and speech API support
-- **Edge** - Good support
-- **Firefox** - Works, some features may vary
-- **Safari** - Works, some features may vary
-
-## App-Like Experience (No Browser Chrome)
-
-To use the teleprompter without browser menus/address bar:
-
-1. Open [index.html](index.html) in Chrome
-2. Click the **install icon** (⊕ or computer icon) in the address bar
-3. Click "Install"
-4. The app opens in its own window with no browser UI
-
-Or manually: Chrome Menu → More Tools → Create Shortcut → Check "Open as window"
-
-This gives you a clean, app-like interface without using fullscreen mode.
-
-## Cost Estimates (Listening Mode)
-
-| Usage | OpenAI (speech-to-text) | Claude (matching) |
-|-------|------------------------|-------------------|
-| 1 hour | ~$0.18 | ~$0.10-0.30 |
-| 10 hours | ~$1.80 | ~$1-3 |
-
-Costs depend on how frequently we poll Claude for position updates (every 3-5 seconds likely).
+An AI "listening mode" (speech-to-text plus semantic matching to auto-advance the script) was
+part of the original plan and is described in early commits, but none of it is in the code. The
+riff/stage-direction conventions above are the surviving pieces of that design.
