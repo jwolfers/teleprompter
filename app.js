@@ -25,8 +25,10 @@ const state = {
 
     // Google Doc sync
     googleDocId: null,        // Currently linked Google Doc ID
+    googleDocTabId: null,     // Which tab of it (null = the doc's default tab)
+    gdocTabs: [],             // Tabs found in the linked doc, in document order
     gdocPollInterval: null,   // Auto-refresh interval
-    gdocLastHtml: '',         // Last fetched content for change detection
+    gdocLastPrint: '',        // Fingerprint of the last content, for change detection
 };
 
 // ===== DOM REFS =====
@@ -621,69 +623,31 @@ function showCountdown(callback) {
 // ===== GOOGLE DOC IMPORT =====
 
 function extractGoogleDocId(url) {
-    // Match /document/d/XXXXX or /document/d/XXXXX/
-    const match = url.match(/\/document\/d\/([a-zA-Z0-9_-]+)/);
+    // Match /document/d/XXXXX or /document/u/0/d/XXXXX
+    const match = url.match(/\/document\/(?:u\/\d+\/)?d\/([a-zA-Z0-9_-]+)/);
     return match ? match[1] : null;
 }
 
-function cleanGoogleDocHtml(rawHtml) {
-    // Parse the HTML and extract the body content
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(rawHtml, 'text/html');
-    const body = doc.body;
-    if (!body) return '';
-
-    // Remove Google's style tags and metadata
-    body.querySelectorAll('style, script, meta, link').forEach(el => el.remove());
-
-    // Convert Google's span-based formatting to semantic HTML
-    // Google Docs uses inline styles for bold/italic rather than <b>/<i>/<em>
-    body.querySelectorAll('span').forEach(span => {
-        const style = span.style;
-        const isBold = style.fontWeight === '700' || style.fontWeight === 'bold';
-        const isItalic = style.fontStyle === 'italic';
-
-        if (isItalic && isBold) {
-            span.outerHTML = `<strong><em>${span.innerHTML}</em></strong>`;
-        } else if (isItalic) {
-            span.outerHTML = `<em>${span.innerHTML}</em>`;
-        } else if (isBold) {
-            span.outerHTML = `<strong>${span.innerHTML}</strong>`;
-        } else {
-            // Unwrap plain spans — keep their text content
-            span.outerHTML = span.innerHTML;
-        }
-    });
-
-    // Let the prompter's own CSS size images (charts export with fixed pixel dimensions)
-    body.querySelectorAll('img').forEach(img => {
-        img.removeAttribute('style');
-        img.removeAttribute('width');
-        img.removeAttribute('height');
-    });
-
-    // Collect paragraphs (keep image-only ones — charts have no text)
-    const paragraphs = [];
-    body.querySelectorAll('p').forEach(p => {
-        const text = p.textContent.trim();
-        if (text || p.querySelector('img')) {
-            paragraphs.push(`<p>${p.innerHTML.trim()}</p>`);
-        }
-    });
-
-    return paragraphs.join('\n');
+// A tab id pinned in the URL, e.g. .../edit?tab=t.abc123
+function extractGoogleDocTabId(url) {
+    const match = url.match(/[?&#]tab=(t\.[a-z0-9]+)/i);
+    return match ? match[1] : null;
 }
 
-async function fetchGoogleDocHtml(docId) {
-    const exportUrl = `https://docs.google.com/document/d/${docId}/export?format=html`;
+function gdocExportUrl(docId, tabId) {
+    // `tab` is undocumented, but it is how Docs exports one tab of a tabbed doc
+    const base = `https://docs.google.com/document/d/${docId}/export?format=html`;
+    return tabId ? `${base}&tab=${encodeURIComponent(tabId)}` : base;
+}
 
+async function fetchGoogleText(url) {
     let response;
     try {
         // In Electron, CORS isn't an issue; in browser, Google may block cross-origin
-        response = await fetch(exportUrl);
+        response = await fetch(url);
     } catch (e) {
         // Fallback: try via a CORS proxy
-        response = await fetch(`https://corsproxy.io/?url=${encodeURIComponent(exportUrl)}`);
+        response = await fetch(`https://corsproxy.io/?url=${encodeURIComponent(url)}`);
     }
 
     if (!response.ok) {
@@ -695,8 +659,247 @@ async function fetchGoogleDocHtml(docId) {
         throw new Error(`Failed to fetch document (HTTP ${response.status}).`);
     }
 
-    const rawHtml = await response.text();
-    return cleanGoogleDocHtml(rawHtml);
+    return response.text();
+}
+
+
+// ----- Converting Google's export HTML into clean, structured script HTML -----
+
+// Tags worth keeping: everything that carries structure a reader can see.
+const GDOC_KEEP_TAGS = new Set([
+    'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'OL', 'LI', 'BLOCKQUOTE', 'PRE', 'HR', 'BR',
+    'TABLE', 'THEAD', 'TBODY', 'TFOOT', 'TR', 'TD', 'TH', 'IMG',
+    'STRONG', 'EM', 'U', 'S', 'SUP', 'SUB', 'A', 'CODE',
+]);
+
+const GDOC_KEEP_ATTRS = {
+    IMG: ['src', 'alt'],
+    A: ['href'],
+    OL: ['start', 'type'],
+    TD: ['colspan', 'rowspan'],
+    TH: ['colspan', 'rowspan'],
+};
+
+// Google's export puts nearly all formatting in a <style> block keyed by
+// generated class names (.c3{font-weight:700}), so those rules have to be read
+// before the markup means anything — bold, italics and indents all live there.
+function parseGdocStylesheet(doc) {
+    const rules = {};
+    doc.querySelectorAll('style').forEach(styleEl => {
+        const css = (styleEl.textContent || '').replace(/\/\*[\s\S]*?\*\//g, '');
+        const ruleRe = /([^{}]+)\{([^{}]*)\}/g;
+        let match;
+        while ((match = ruleRe.exec(css)) !== null) {
+            const decls = {};
+            match[2].split(';').forEach(decl => {
+                const colon = decl.indexOf(':');
+                if (colon > 0) {
+                    decls[decl.slice(0, colon).trim().toLowerCase()] = decl.slice(colon + 1).trim();
+                }
+            });
+            match[1].split(',').forEach(sel => {
+                const cls = sel.trim().match(/^\.([A-Za-z0-9_-]+)$/);
+                if (cls) rules[cls[1]] = Object.assign(rules[cls[1]] || {}, decls);
+            });
+        }
+    });
+    return rules;
+}
+
+const GDOC_STYLE_PROPS = ['font-weight', 'font-style', 'text-decoration',
+    'text-decoration-line', 'margin-left', 'text-align', 'vertical-align'];
+
+// An element's effective style: its class rules, then its own inline style
+function gdocEffectiveStyle(el, rules) {
+    const style = {};
+    (el.getAttribute('class') || '').split(/\s+/).forEach(cls => {
+        if (cls && rules[cls]) Object.assign(style, rules[cls]);
+    });
+    GDOC_STYLE_PROPS.forEach(prop => {
+        const val = el.style && el.style.getPropertyValue(prop);
+        if (val) style[prop] = val;
+    });
+    return style;
+}
+
+// Only elements that directly hold text get formatting tags, so a bold run
+// inside a paragraph doesn't also bold the paragraph around it.
+function hasDirectText(el) {
+    for (const node of el.childNodes) {
+        if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) return true;
+    }
+    return false;
+}
+
+// Carry the doc's indent levels across (Google indents by 36pt / 48px a level)
+function markGdocIndent(el, style) {
+    const raw = style['margin-left'];
+    if (!raw) return;
+    const amount = parseFloat(raw);
+    if (!amount || amount < 0) return;
+    const perLevel = raw.includes('pt') ? 36 : 48;
+    const level = Math.min(6, Math.round(amount / perLevel));
+    if (level > 0) el.setAttribute('data-indent', String(level));
+}
+
+function cleanGoogleDocHtml(rawHtml) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(rawHtml, 'text/html');
+    const body = doc.body;
+    if (!body) return '';
+
+    // Read the stylesheet before dropping it — the class names are the formatting
+    const rules = parseGdocStylesheet(doc);
+    doc.querySelectorAll('style, script, meta, link, noscript').forEach(el => el.remove());
+
+    // Turn Google's class- and style-driven formatting into semantic tags
+    Array.from(body.querySelectorAll('*')).forEach(el => {
+        const style = gdocEffectiveStyle(el, rules);
+        if (/^(P|H[1-6]|LI|UL|OL|BLOCKQUOTE)$/.test(el.tagName)) markGdocIndent(el, style);
+        if (!hasDirectText(el)) return;
+
+        const decoration = style['text-decoration'] || style['text-decoration-line'] || '';
+        const weight = parseInt(style['font-weight'], 10);
+        const wraps = [];
+        if (style['font-weight'] === 'bold' || weight >= 600) wraps.push('strong');
+        if (style['font-style'] === 'italic') wraps.push('em');
+        if (decoration.includes('underline') && el.tagName !== 'A') wraps.push('u');
+        if (decoration.includes('line-through')) wraps.push('s');
+        if (style['vertical-align'] === 'super') wraps.push('sup');
+        else if (style['vertical-align'] === 'sub') wraps.push('sub');
+
+        wraps.forEach(tag => {
+            const wrapper = doc.createElement(tag);
+            while (el.firstChild) wrapper.appendChild(el.firstChild);
+            el.appendChild(wrapper);
+        });
+    });
+
+    // Nested bullets: Google indents the list, not the item — move it to the items
+    body.querySelectorAll('ul[data-indent], ol[data-indent]').forEach(list => {
+        const level = parseInt(list.getAttribute('data-indent'), 10) - 1;
+        list.removeAttribute('data-indent');
+        if (level <= 0) return;
+        Array.from(list.children).forEach(li => {
+            if (li.tagName === 'LI' && !li.hasAttribute('data-indent')) {
+                li.setAttribute('data-indent', String(level));
+            }
+        });
+    });
+
+    // Links come through Google's redirector — point them at the real target
+    body.querySelectorAll('a[href]').forEach(a => {
+        const match = a.getAttribute('href').match(/^https?:\/\/www\.google\.com\/url\?q=([^&]+)/);
+        if (match) {
+            try { a.setAttribute('href', decodeURIComponent(match[1])); } catch (e) { /* leave as-is */ }
+        }
+    });
+
+    // Unwrap everything else (spans, the doc-content div, …), keeping its text
+    Array.from(body.querySelectorAll('*')).reverse().forEach(el => {
+        if (!GDOC_KEEP_TAGS.has(el.tagName)) el.replaceWith(...el.childNodes);
+    });
+
+    // Drop Google's styling attributes; the prompter does its own
+    body.querySelectorAll('*').forEach(el => {
+        const keep = GDOC_KEEP_ATTRS[el.tagName] || [];
+        Array.from(el.attributes).forEach(attr => {
+            if (attr.name !== 'data-indent' && !keep.includes(attr.name)) {
+                el.removeAttribute(attr.name);
+            }
+        });
+    });
+
+    // Drop blank blocks, but keep image-only ones (charts have no text)
+    body.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, blockquote').forEach(el => {
+        if (!el.textContent.trim() && !el.querySelector('img')) el.remove();
+    });
+    body.querySelectorAll('ul, ol, table').forEach(el => {
+        if (!el.textContent.trim() && !el.querySelector('img')) el.remove();
+    });
+
+    return body.innerHTML.trim();
+}
+
+// Google mints new class names and re-signs image URLs on every export, so the
+// raw HTML always looks different. Compare words and structure instead, or the
+// prompter rebuilds itself every poll and the reader sees the script jump.
+function gdocFingerprint(html) {
+    return html.replace(/<img[^>]*>/gi, '<img>').replace(/\s+/g, ' ').trim();
+}
+
+
+// ----- Tabs -----
+
+// There is no way to list a doc's tabs without OAuth, so pull candidate tab ids
+// out of the doc's own pages and confirm each by exporting it: ids that aren't
+// real export the default tab, so identical exports collapse back to one entry.
+async function discoverGoogleDocTabIds(docId) {
+    const pages = [
+        `https://docs.google.com/document/d/${docId}/edit`,
+        `https://docs.google.com/document/d/${docId}/mobilebasic`,
+        `https://docs.google.com/document/d/${docId}/preview`,
+    ];
+
+    for (const url of pages) {
+        let html;
+        try {
+            html = await fetchGoogleText(url);
+        } catch (e) {
+            continue;
+        }
+        const ids = [];
+        const idRe = /["'/](t\.[a-z0-9]{1,24})["'&]/gi;
+        let match;
+        while ((match = idRe.exec(html)) !== null) {
+            if (!ids.includes(match[1])) ids.push(match[1]);
+        }
+        if (ids.length > 1) return ids;
+    }
+    return [];
+}
+
+// A label for the tab list: the tab's opening line, which for most scripts is
+// its heading — falling back to the start of the text if there are no blocks.
+function gdocFirstLine(html) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    let text = '';
+    for (const el of doc.body.querySelectorAll('h1, h2, h3, h4, h5, h6, p, li')) {
+        text = el.textContent.trim().replace(/\s+/g, ' ');
+        if (text) break;
+    }
+    if (!text) text = (doc.body.textContent || '').trim().replace(/\s+/g, ' ');
+    if (!text) return 'Untitled tab';
+    return text.length > 60 ? text.slice(0, 57) + '…' : text;
+}
+
+// Returns [{ id, title, html }] for a tabbed doc, or [] when there's only one tab
+async function fetchGoogleDocTabs(docId) {
+    const ids = await discoverGoogleDocTabIds(docId);
+    if (ids.length < 2) return [];
+
+    const fetched = await Promise.all(ids.slice(0, 12).map(async id => {
+        try {
+            const html = cleanGoogleDocHtml(await fetchGoogleText(gdocExportUrl(docId, id)));
+            return html ? { id, html, print: gdocFingerprint(html) } : null;
+        } catch (e) {
+            return null;
+        }
+    }));
+
+    const tabs = [];
+    const seen = new Set();
+    fetched.forEach(tab => {
+        if (!tab || seen.has(tab.print)) return;
+        seen.add(tab.print);
+        tabs.push({ id: tab.id, html: tab.html, title: gdocFirstLine(tab.html) });
+    });
+    return tabs.length > 1 ? tabs : [];
+}
+
+// The script for a doc: one named tab of it, or the doc's default (first) tab
+async function fetchGoogleDocHtml(docId, tabId) {
+    return cleanGoogleDocHtml(await fetchGoogleText(gdocExportUrl(docId, tabId)));
 }
 
 // ===== SENTENCE ANCHORING =====
@@ -840,11 +1043,14 @@ function restoreScrollAnchor(anchor) {
     updateProgress(state.scrollPosition, maxScroll);
 }
 
-// Apply a Google Doc update to the prompter, preserving the reading position
-function applyGoogleDocContent(html) {
-    // Skip if content hasn't changed
-    if (html === state.gdocLastHtml) return false;
-    state.gdocLastHtml = html;
+// Apply a Google Doc update to the prompter, preserving the reading position.
+// `force` is for the times the user asked for it (an import, a manual refresh),
+// where the script should land even if the doc is byte-for-byte what we last saw.
+function applyGoogleDocContent(html, { force = false } = {}) {
+    // Skip if the words and structure haven't changed — see gdocFingerprint
+    const print = gdocFingerprint(html);
+    if (print === state.gdocLastPrint && !force) return false;
+    state.gdocLastPrint = print;
 
     const anchor = captureScrollAnchor();
     setScript(stripEmptyParagraphs(html), { keepScroll: true });
@@ -857,8 +1063,10 @@ function startGdocPolling() {
     // Poll every 10 seconds
     state.gdocPollInterval = setInterval(async () => {
         if (!state.googleDocId) return;
+        // Don't overwrite the script out from under someone typing in it
+        if (document.activeElement === prompterContent) return;
         try {
-            const html = await fetchGoogleDocHtml(state.googleDocId);
+            const html = await fetchGoogleDocHtml(state.googleDocId, state.googleDocTabId);
             if (html && applyGoogleDocContent(html)) {
                 flashGdocSyncIndicator();
             }
@@ -876,9 +1084,11 @@ function stopGdocPolling() {
     }
 }
 
-function linkGoogleDoc(docId, html) {
+function linkGoogleDoc(docId, tabId, html, tabs) {
     state.googleDocId = docId;
-    state.gdocLastHtml = html;
+    state.googleDocTabId = tabId || null;
+    state.gdocTabs = tabs || [];
+    state.gdocLastPrint = gdocFingerprint(html);
     updateGdocLinkUI();
     startGdocPolling();
 }
@@ -886,7 +1096,9 @@ function linkGoogleDoc(docId, html) {
 function unlinkGoogleDoc() {
     stopGdocPolling();
     state.googleDocId = null;
-    state.gdocLastHtml = '';
+    state.googleDocTabId = null;
+    state.gdocTabs = [];
+    state.gdocLastPrint = '';
     updateGdocLinkUI();
 }
 
@@ -895,6 +1107,9 @@ function updateGdocLinkUI() {
     const badge = $('#gdoc-linked-badge');
     if (state.googleDocId) {
         badge.classList.remove('hidden');
+        const tab = state.gdocTabs.find(t => t.id === state.googleDocTabId);
+        badge.title = (tab ? `Reading tab “${tab.title}”. ` : '') +
+            'Click to refresh · Right-click to unlink';
     } else {
         badge.classList.add('hidden');
     }
@@ -913,8 +1128,8 @@ async function refreshGoogleDoc() {
     const badge = $('#gdoc-linked-badge');
     badge.textContent = '⟳ Syncing…';
     try {
-        const html = await fetchGoogleDocHtml(state.googleDocId);
-        if (html) applyGoogleDocContent(html);
+        const html = await fetchGoogleDocHtml(state.googleDocId, state.googleDocTabId);
+        if (html) applyGoogleDocContent(html, { force: true });
         badge.textContent = '🔗 Linked';
     } catch (err) {
         badge.textContent = '⚠ Sync failed';
@@ -926,10 +1141,54 @@ async function refreshGoogleDoc() {
 const gdocModal = $('#gdoc-modal');
 const gdocUrlInput = $('#input-gdoc-url');
 const gdocStatus = $('#gdoc-status');
+const gdocTabList = $('#gdoc-tabs');
+const gdocImportBtn = $('#btn-gdoc-import');
+
+function hideGdocTabList() {
+    gdocTabList.innerHTML = '';
+    gdocTabList.classList.add('hidden');
+    gdocImportBtn.classList.remove('hidden');
+}
+
+// Load one tab of a linked doc into the prompter
+function useGdocTab(docId, tabs, tab) {
+    applyGoogleDocContent(tab.html, { force: true });
+    linkGoogleDoc(docId, tab.id, tab.html, tabs);
+    showGdocTabList(docId, tabs);
+}
+
+// The doc's other tabs, offered after the first one has already been imported.
+// Nothing to dismiss and nothing to choose — this is just how you switch.
+function showGdocTabList(docId, tabs) {
+    gdocTabList.innerHTML = '';
+    gdocImportBtn.classList.add('hidden');
+    const showing = tabs.findIndex(t => t.id === state.googleDocTabId) + 1;
+    gdocStatus.textContent =
+        `Showing tab ${showing || 1} of ${tabs.length}. Pick another to switch.`;
+
+    tabs.forEach((tab, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'gdoc-tab-choice';
+        if (tab.id === state.googleDocTabId) btn.classList.add('current');
+        btn.innerHTML = `<span class="gdoc-tab-num">${i + 1}</span>`;
+        btn.appendChild(document.createTextNode(tab.title));
+        btn.addEventListener('click', () => useGdocTab(docId, tabs, tab));
+        gdocTabList.appendChild(btn);
+    });
+
+    gdocTabList.classList.remove('hidden');
+}
 
 $('#btn-gdoc').addEventListener('click', () => {
-    gdocUrlInput.value = '';
     gdocStatus.textContent = '';
+    hideGdocTabList();
+    // Re-opening a linked multi-tab doc goes straight back to its tab list
+    if (state.googleDocId && state.gdocTabs.length > 1) {
+        gdocUrlInput.value = `https://docs.google.com/document/d/${state.googleDocId}/edit`;
+        showGdocTabList(state.googleDocId, state.gdocTabs);
+    } else {
+        gdocUrlInput.value = '';
+    }
     gdocModal.classList.remove('hidden');
     gdocUrlInput.focus();
 });
@@ -942,7 +1201,7 @@ gdocModal.addEventListener('click', (e) => {
     if (e.target === gdocModal) gdocModal.classList.add('hidden');
 });
 
-$('#btn-gdoc-import').addEventListener('click', async () => {
+gdocImportBtn.addEventListener('click', async () => {
     const url = gdocUrlInput.value.trim();
     if (!url) {
         gdocStatus.textContent = 'Please paste a Google Doc URL.';
@@ -956,20 +1215,46 @@ $('#btn-gdoc-import').addEventListener('click', async () => {
     }
 
     gdocStatus.textContent = 'Importing…';
-    $('#btn-gdoc-import').disabled = true;
+    gdocImportBtn.disabled = true;
 
     try {
-        const html = await fetchGoogleDocHtml(docId);
+        // A URL that names a tab means the choice is already made
+        const pinnedTab = extractGoogleDocTabId(url);
+
+        // Look for tabs while the doc itself downloads — most docs have one tab,
+        // and this way looking costs no extra wait
+        const [content, tabSearch] = await Promise.allSettled([
+            fetchGoogleDocHtml(docId, pinnedTab),
+            pinnedTab ? Promise.resolve([]) : fetchGoogleDocTabs(docId),
+        ]);
+
+        // A tabbed doc reads its first tab; the rest are one click away
+        const tabs = tabSearch.status === 'fulfilled' ? tabSearch.value : [];
+        if (tabs.length > 1) {
+            useGdocTab(docId, tabs, tabs[0]);
+            return;
+        }
+
+        if (content.status === 'rejected') throw content.reason;
+        const html = content.value;
         if (!html) {
             throw new Error('The document appears to be empty.');
         }
-        applyGoogleDocContent(html);
-        linkGoogleDoc(docId, html);
+        applyGoogleDocContent(html, { force: true });
+        linkGoogleDoc(docId, pinnedTab, html, []);
         gdocModal.classList.add('hidden');
     } catch (err) {
         gdocStatus.textContent = err.message;
     } finally {
-        $('#btn-gdoc-import').disabled = false;
+        gdocImportBtn.disabled = false;
+    }
+});
+
+// Typing a different URL puts the Import button back in place of the tab list
+gdocUrlInput.addEventListener('input', () => {
+    if (!gdocTabList.classList.contains('hidden')) {
+        hideGdocTabList();
+        gdocStatus.textContent = '';
     }
 });
 
@@ -977,7 +1262,7 @@ $('#btn-gdoc-import').addEventListener('click', async () => {
 gdocUrlInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
         e.preventDefault();
-        $('#btn-gdoc-import').click();
+        gdocImportBtn.click();
     }
 });
 
@@ -1280,5 +1565,5 @@ maybeShowWelcome();
 requestAnimationFrame(positionContent);
 
 // Version stamp
-const VERSION_TIMESTAMP = '2026-08-05 v10 — wpm speed + display settings menu';
+const VERSION_TIMESTAMP = '2026-09-09 v11 — Google Doc tabs, formatting, steadier sync';
 document.getElementById('version-stamp').textContent = VERSION_TIMESTAMP;

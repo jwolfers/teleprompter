@@ -125,10 +125,11 @@
     <div id="gdoc-modal" class="modal hidden">
         <div class="modal-content">
             <h2>Import from Google Docs</h2>
-            <p class="modal-hint">Paste the URL of a Google Doc. The doc must be shared as "Anyone with the link can view".</p>
+            <p class="modal-hint">Paste the URL of a Google Doc. The doc must be shared as "Anyone with the link can view". If it has several tabs it reads the first one, and you can switch to another.</p>
             <label for="input-gdoc-url">Google Doc URL</label>
             <input type="text" id="input-gdoc-url" placeholder="https://docs.google.com/document/d/...">
             <div id="gdoc-status" class="modal-hint" style="min-height:1.2em;"></div>
+            <div id="gdoc-tabs" class="gdoc-tabs hidden"></div>
             <div class="modal-actions">
                 <button id="btn-gdoc-cancel">Cancel</button>
                 <button id="btn-gdoc-import" class="primary">Import</button>
@@ -178,8 +179,12 @@
                         prompter any time it's paused.</li>
                     <li><strong>Import a Google Doc.</strong> Click <em>Import Google Doc</em> and paste the
                         doc's URL. The doc must be shared as &ldquo;Anyone with the link can view&rdquo;.
+                        If the doc has several <strong>tabs</strong>, it reads the <strong>first tab</strong> and lists
+                        the others so you can switch with one click; re-open <em>Import Google Doc</em> to switch again
+                        later. (Paste a URL that already names a tab and it uses that one.)
                         The prompter then stays <em>linked</em>: it re-checks the doc every 10 seconds and
-                        picks up your edits. Click the 🔗 badge to refresh immediately; right-click it to unlink.</li>
+                        picks up your edits, and leaves the script alone when nothing has actually changed.
+                        Click the 🔗 badge to refresh immediately; right-click it to unlink.</li>
                     <li><strong>Demo Script</strong> loads a sample so you can try everything out.</li>
                 </ul>
 
@@ -190,6 +195,8 @@
                     <li><strong>[Bracketed text]</strong> becomes a dimmed <strong>stage direction</strong>
                         (e.g. [Pause for applause]) that isn't meant to be read aloud.</li>
                     <li>Images and charts in a Google Doc are imported and scaled to fit the column.</li>
+                    <li>An imported doc keeps its structure: <strong>bold</strong>, underline, headings,
+                        bullets, numbering, indents, block quotes and tables all come across.</li>
                 </ul>
 
                 <h3>Playing and controlling</h3>
