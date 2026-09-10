@@ -137,6 +137,9 @@
         </div>
     </div>
 
+    <!-- Hover preview of a tab's opening words, floated beside the tab list -->
+    <div id="gdoc-tab-preview" class="gdoc-tab-preview hidden"></div>
+
     <!-- First-run welcome: quick lesson shown once on first open -->
     <div id="welcome-modal" class="modal hidden">
         <div class="modal-content welcome-content">
@@ -180,8 +183,9 @@
                     <li><strong>Import a Google Doc.</strong> Click <em>Import Google Doc</em> and paste the
                         doc's URL. The doc must be shared as &ldquo;Anyone with the link can view&rdquo;.
                         If the doc has several <strong>tabs</strong>, it reads the <strong>first tab</strong> and lists
-                        the others so you can switch with one click; re-open <em>Import Google Doc</em> to switch again
-                        later. (Paste a URL that already names a tab and it uses that one.)
+                        the others by name so you can switch with one click &mdash; hover a tab to preview its opening
+                        words. Re-open <em>Import Google Doc</em> to switch again later. (Paste a URL that already
+                        names a tab and it uses that one.)
                         The prompter then stays <em>linked</em>: it re-checks the doc every 10 seconds and
                         picks up your edits, and leaves the script alone when nothing has actually changed.
                         Click the 🔗 badge to refresh immediately; right-click it to unlink.</li>

@@ -704,6 +704,31 @@ body.is-electron #btn-help {
     border-color: #666;
 }
 
+/* Hover preview: a tab's opening words, floated beside its button */
+.gdoc-tab-preview {
+    position: fixed;
+    z-index: 2100;
+    width: 340px;
+    max-height: min(420px, 60vh);
+    overflow: hidden;
+    padding: 12px 14px;
+    background: #15152a;
+    border: 1px solid #4a4a70;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+    color: #c8c8dc;
+    font-size: 12px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    pointer-events: none;
+}
+
+/* Only fade the bottom when the text actually runs past the box */
+.gdoc-tab-preview.clipped {
+    -webkit-mask-image: linear-gradient(to bottom, #000 82%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 82%, transparent 100%);
+}
+
 /* The tab currently in the prompter */
 .gdoc-tab-choice.current {
     background: #2c2c44;

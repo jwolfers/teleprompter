@@ -897,6 +897,42 @@ async function scrapeGoogleDocTabs(docId, pageHtml) {
     return tabs.length > 1 ? tabs : [];
 }
 
+// The opening words of a tab, for the hover preview. Keeps the paragraph breaks
+// so a script's shape is recognisable at a glance.
+const GDOC_PREVIEW_WORDS = 200;
+
+function gdocPreviewText(html) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const blocks = doc.body.querySelectorAll('h1, h2, h3, h4, h5, h6, p, li');
+    const lines = [];
+    let words = 0;
+
+    for (const el of blocks) {
+        const text = el.textContent.trim().replace(/\s+/g, ' ');
+        if (!text) continue;
+        const parts = text.split(' ');
+        if (words + parts.length > GDOC_PREVIEW_WORDS) {
+            lines.push(parts.slice(0, GDOC_PREVIEW_WORDS - words).join(' ') + ' …');
+            break;
+        }
+        lines.push(text);
+        words += parts.length;
+    }
+
+    if (!lines.length) {
+        const bare = (doc.body.textContent || '').trim().replace(/\s+/g, ' ');
+        if (bare) lines.push(bare.split(' ').slice(0, GDOC_PREVIEW_WORDS).join(' '));
+    }
+    return lines.join('\n') || 'This tab has no text.';
+}
+
+// A tab's content, fetched once and kept — so hovering to preview a tab also
+// makes switching to it instant. The 10-second poll corrects it if it goes stale.
+async function gdocTabHtml(docId, tab) {
+    if (!tab.html) tab.html = await fetchGoogleDocHtml(docId, tab.id);
+    return tab.html;
+}
+
 // A label for the tab list: the tab's opening line, which for most scripts is
 // its heading — falling back to the start of the text if there are no blocks.
 function gdocFirstLine(html) {
@@ -1179,18 +1215,74 @@ const gdocTabList = $('#gdoc-tabs');
 const gdocImportBtn = $('#btn-gdoc-import');
 
 function hideGdocTabList() {
+    hideGdocTabPreview();
     gdocTabList.innerHTML = '';
     gdocTabList.classList.add('hidden');
     gdocImportBtn.classList.remove('hidden');
 }
 
+
+// ----- Hover preview of a tab's opening words -----
+
+const gdocPreview = $('#gdoc-tab-preview');
+let gdocPreviewToken = 0;   // bumped on every hover, so a slow fetch can't land late
+
+// The tab list appearing under a resting pointer counts as a mouseenter, which
+// would pop a preview nobody asked for. Wait for the pointer to actually move.
+let gdocPreviewArmed = false;
+document.addEventListener('mousemove', () => { gdocPreviewArmed = true; }, true);
+
+function hideGdocTabPreview() {
+    gdocPreviewToken++;
+    gdocPreview.classList.add('hidden');
+}
+
+function renderGdocPreview(text, anchor) {
+    gdocPreview.textContent = text;
+    gdocPreview.classList.remove('hidden');
+
+    // Sit beside the button, flipping to its other side when short of room
+    const rect = anchor.getBoundingClientRect();
+    const box = gdocPreview.getBoundingClientRect();
+    const gap = 12;
+    let left = rect.right + gap;
+    if (left + box.width > window.innerWidth - 8) left = rect.left - box.width - gap;
+    gdocPreview.style.left = Math.max(8, left) + 'px';
+    gdocPreview.style.top = Math.max(8,
+        Math.min(rect.top, window.innerHeight - box.height - 8)) + 'px';
+
+    // Fade the bottom edge only when there's more text than fits
+    gdocPreview.classList.toggle('clipped',
+        gdocPreview.scrollHeight > gdocPreview.clientHeight + 1);
+}
+
+async function showGdocTabPreview(docId, tab, anchor, { viaFocus = false } = {}) {
+    if (!viaFocus && !gdocPreviewArmed) return;
+    const token = ++gdocPreviewToken;
+    if (tab.html) {
+        renderGdocPreview(gdocPreviewText(tab.html), anchor);
+        return;
+    }
+
+    renderGdocPreview('Loading preview…', anchor);
+    let text;
+    try {
+        text = gdocPreviewText(await gdocTabHtml(docId, tab));
+    } catch (e) {
+        text = 'Could not load a preview of this tab.';
+    }
+    if (token !== gdocPreviewToken) return;   // pointer has moved on
+    renderGdocPreview(text, anchor);
+}
+
 // Load one tab of a linked doc into the prompter
 async function useGdocTab(docId, tabs, tab) {
+    hideGdocTabPreview();
     gdocTabList.classList.add('hidden');
     gdocStatus.textContent = `Loading “${tab.title}”…`;
     try {
         // Reading the tab tree gives names but no content, so fetch it now
-        const html = tab.html || await fetchGoogleDocHtml(docId, tab.id);
+        const html = await gdocTabHtml(docId, tab);
         if (!html) throw new Error('That tab appears to be empty.');
         applyGoogleDocContent(html, { force: true });
         linkGoogleDoc(docId, tab.id, html, tabs);
@@ -1205,6 +1297,7 @@ async function useGdocTab(docId, tabs, tab) {
 // The doc's other tabs, offered after the first one has already been imported.
 // Nothing to dismiss and nothing to choose — this is just how you switch.
 function showGdocTabList(docId, tabs) {
+    gdocPreviewArmed = false;
     gdocTabList.innerHTML = '';
     gdocImportBtn.classList.add('hidden');
     const showing = tabs.findIndex(t => t.id === state.googleDocTabId) + 1;
@@ -1218,6 +1311,10 @@ function showGdocTabList(docId, tabs) {
         btn.innerHTML = `<span class="gdoc-tab-num">${i + 1}</span>`;
         btn.appendChild(document.createTextNode(tab.title));
         btn.addEventListener('click', () => useGdocTab(docId, tabs, tab));
+        btn.addEventListener('mouseenter', () => showGdocTabPreview(docId, tab, btn));
+        btn.addEventListener('focus', () => showGdocTabPreview(docId, tab, btn, { viaFocus: true }));
+        btn.addEventListener('mouseleave', hideGdocTabPreview);
+        btn.addEventListener('blur', hideGdocTabPreview);
         gdocTabList.appendChild(btn);
     });
 
@@ -1239,11 +1336,15 @@ $('#btn-gdoc').addEventListener('click', () => {
 });
 
 $('#btn-gdoc-cancel').addEventListener('click', () => {
+    hideGdocTabPreview();
     gdocModal.classList.add('hidden');
 });
 
 gdocModal.addEventListener('click', (e) => {
-    if (e.target === gdocModal) gdocModal.classList.add('hidden');
+    if (e.target === gdocModal) {
+        hideGdocTabPreview();
+        gdocModal.classList.add('hidden');
+    }
 });
 
 gdocImportBtn.addEventListener('click', async () => {
@@ -1612,5 +1713,5 @@ maybeShowWelcome();
 requestAnimationFrame(positionContent);
 
 // Version stamp
-const VERSION_TIMESTAMP = '2026-09-09 v12 — real Google Doc tab names';
+const VERSION_TIMESTAMP = '2026-09-09 v13 — tab preview on hover';
 document.getElementById('version-stamp').textContent = VERSION_TIMESTAMP;
