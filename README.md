@@ -96,9 +96,15 @@ markup, and compares a fingerprint of words and structure (not raw HTML) to deci
 anything really changed.
 
 Listing a doc's tabs officially requires OAuth, which this app deliberately avoids. Instead it
-scrapes candidate tab ids from the doc's own pages and confirms each by exporting it — ids that
-aren't real return the default tab and collapse away. If that finds nothing, the import falls
-back to Google's default export, which is the first tab anyway.
+reads the tab tree out of the doc's own editor page, where Google ships it in `DOCS_modelChunk`:
+a `mkch` chunk names the first tab, and one `ac` chunk per tab after it carries that tab's id and
+name. That is the only place a tab's *name* exists — the HTML export contains content and nothing
+else — and the chunks are already in tab order. If that can't be read, it falls back to scraping
+candidate tab ids and confirming each by exporting it, which still works but can only label tabs
+by their opening line.
+
+Worth knowing: exporting **without** a `tab` parameter returns every tab concatenated, not the
+first tab. So once tabs are known the app always names one explicitly.
 
 ## File structure
 

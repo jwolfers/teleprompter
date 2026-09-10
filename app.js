@@ -831,51 +831,51 @@ function gdocFingerprint(html) {
 
 // ----- Tabs -----
 
-// There is no way to list a doc's tabs without OAuth, so pull candidate tab ids
-// out of the doc's own pages and confirm each by exporting it: ids that aren't
-// real export the default tab, so identical exports collapse back to one entry.
-async function discoverGoogleDocTabIds(docId) {
-    const pages = [
-        `https://docs.google.com/document/d/${docId}/edit`,
-        `https://docs.google.com/document/d/${docId}/mobilebasic`,
-        `https://docs.google.com/document/d/${docId}/preview`,
-    ];
+// The doc's own editor page carries the tab tree in its DOCS_modelChunk:
+//   {"ty":"mkch","d":[[1,"Script"]]}                       <- the first tab
+//   {"ty":"ac","d":["t.k3uh…",[1,"Two-column"],[1]]}       <- each tab after it
+// That is the only place a tab's *name* exists — the HTML export carries content
+// and nothing else — and the chunks are already in tab order.
+const GDOC_FIRST_TAB_ID = 't.0';
 
-    for (const url of pages) {
-        let html;
-        try {
-            html = await fetchGoogleText(url);
-        } catch (e) {
-            continue;
-        }
-        const ids = [];
-        const idRe = /["'/](t\.[a-z0-9]{1,24})["'&]/gi;
-        let match;
-        while ((match = idRe.exec(html)) !== null) {
-            if (!ids.includes(match[1])) ids.push(match[1]);
-        }
-        if (ids.length > 1) return ids;
+// Titles arrive JSON-escaped (' for an apostrophe, and so on)
+function gdocDecodeTitle(quoted) {
+    try {
+        return JSON.parse(quoted);
+    } catch (e) {
+        return quoted.slice(1, -1);
     }
-    return [];
 }
 
-// A label for the tab list: the tab's opening line, which for most scripts is
-// its heading — falling back to the start of the text if there are no blocks.
-function gdocFirstLine(html) {
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    let text = '';
-    for (const el of doc.body.querySelectorAll('h1, h2, h3, h4, h5, h6, p, li')) {
-        text = el.textContent.trim().replace(/\s+/g, ' ');
-        if (text) break;
+// Returns [{ id, title }] in tab order, or [] if this page has no tab tree
+function parseGdocTabTree(pageHtml) {
+    const tabs = [];
+
+    const first = pageHtml.match(/"ty"\s*:\s*"mkch"\s*,\s*"d"\s*:\s*\[\s*\[\s*\d+\s*,\s*("(?:[^"\\]|\\.)*")/);
+    if (first) tabs.push({ id: GDOC_FIRST_TAB_ID, title: gdocDecodeTitle(first[1]) });
+
+    const rest = /"ty"\s*:\s*"ac"\s*,\s*"d"\s*:\s*\[\s*"(t\.[a-z0-9]+)"\s*,\s*\[\s*\d+\s*,\s*("(?:[^"\\]|\\.)*")/g;
+    let match;
+    while ((match = rest.exec(pageHtml)) !== null) {
+        if (!tabs.some(t => t.id === match[1])) {
+            tabs.push({ id: match[1], title: gdocDecodeTitle(match[2]) });
+        }
     }
-    if (!text) text = (doc.body.textContent || '').trim().replace(/\s+/g, ' ');
-    if (!text) return 'Untitled tab';
-    return text.length > 60 ? text.slice(0, 57) + '…' : text;
+
+    return tabs.length > 1 ? tabs : [];
 }
 
-// Returns [{ id, title, html }] for a tabbed doc, or [] when there's only one tab
-async function fetchGoogleDocTabs(docId) {
-    const ids = await discoverGoogleDocTabIds(docId);
+// Fallback for when the tab tree can't be read: scrape candidate tab ids and
+// confirm each by exporting it. Ids that aren't real export the whole document,
+// so those collapse together and drop out. Labels are only as good as the tab's
+// opening line, but this keeps tabs working if Google reshapes its page.
+async function scrapeGoogleDocTabs(docId, pageHtml) {
+    const ids = [];
+    const idRe = /["'/](t\.[a-z0-9]{1,24})["'&]/gi;
+    let match;
+    while ((match = idRe.exec(pageHtml)) !== null) {
+        if (!ids.includes(match[1])) ids.push(match[1]);
+    }
     if (ids.length < 2) return [];
 
     const fetched = await Promise.all(ids.slice(0, 12).map(async id => {
@@ -895,6 +895,40 @@ async function fetchGoogleDocTabs(docId) {
         tabs.push({ id: tab.id, html: tab.html, title: gdocFirstLine(tab.html) });
     });
     return tabs.length > 1 ? tabs : [];
+}
+
+// A label for the tab list: the tab's opening line, which for most scripts is
+// its heading — falling back to the start of the text if there are no blocks.
+function gdocFirstLine(html) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    let text = '';
+    for (const el of doc.body.querySelectorAll('h1, h2, h3, h4, h5, h6, p, li')) {
+        text = el.textContent.trim().replace(/\s+/g, ' ');
+        if (text) break;
+    }
+    if (!text) text = (doc.body.textContent || '').trim().replace(/\s+/g, ' ');
+    if (!text) return 'Untitled tab';
+    return text.length > 60 ? text.slice(0, 57) + '…' : text;
+}
+
+// Returns [{ id, title, html? }] in tab order, or [] when the doc has one tab.
+// Only /edit and /preview carry the tab tree; /mobilebasic doesn't.
+async function fetchGoogleDocTabs(docId) {
+    let lastPage = null;
+
+    for (const page of ['edit', 'preview']) {
+        let html;
+        try {
+            html = await fetchGoogleText(`https://docs.google.com/document/d/${docId}/${page}`);
+        } catch (e) {
+            continue;
+        }
+        lastPage = html;
+        const tabs = parseGdocTabTree(html);
+        if (tabs.length > 1) return tabs;
+    }
+
+    return lastPage ? scrapeGoogleDocTabs(docId, lastPage) : [];
 }
 
 // The script for a doc: one named tab of it, or the doc's default (first) tab
@@ -1151,9 +1185,20 @@ function hideGdocTabList() {
 }
 
 // Load one tab of a linked doc into the prompter
-function useGdocTab(docId, tabs, tab) {
-    applyGoogleDocContent(tab.html, { force: true });
-    linkGoogleDoc(docId, tab.id, tab.html, tabs);
+async function useGdocTab(docId, tabs, tab) {
+    gdocTabList.classList.add('hidden');
+    gdocStatus.textContent = `Loading “${tab.title}”…`;
+    try {
+        // Reading the tab tree gives names but no content, so fetch it now
+        const html = tab.html || await fetchGoogleDocHtml(docId, tab.id);
+        if (!html) throw new Error('That tab appears to be empty.');
+        applyGoogleDocContent(html, { force: true });
+        linkGoogleDoc(docId, tab.id, html, tabs);
+    } catch (err) {
+        gdocStatus.textContent = err.message;
+        gdocTabList.classList.remove('hidden');
+        return;
+    }
     showGdocTabList(docId, tabs);
 }
 
@@ -1228,10 +1273,12 @@ gdocImportBtn.addEventListener('click', async () => {
             pinnedTab ? Promise.resolve([]) : fetchGoogleDocTabs(docId),
         ]);
 
-        // A tabbed doc reads its first tab; the rest are one click away
+        // A tabbed doc reads its first tab; the rest are one click away.
+        // This matters beyond convenience: with no tab named, Google exports
+        // every tab run together, which is not what anyone wants to read from.
         const tabs = tabSearch.status === 'fulfilled' ? tabSearch.value : [];
         if (tabs.length > 1) {
-            useGdocTab(docId, tabs, tabs[0]);
+            await useGdocTab(docId, tabs, tabs[0]);
             return;
         }
 
@@ -1565,5 +1612,5 @@ maybeShowWelcome();
 requestAnimationFrame(positionContent);
 
 // Version stamp
-const VERSION_TIMESTAMP = '2026-09-09 v11 — Google Doc tabs, formatting, steadier sync';
+const VERSION_TIMESTAMP = '2026-09-09 v12 — real Google Doc tab names';
 document.getElementById('version-stamp').textContent = VERSION_TIMESTAMP;
