@@ -29,7 +29,17 @@
             "signAndEditExecutable": false
         },
         "mac": {
-            "target": "dmg"
+            "target": [
+                {
+                    "target": "dmg",
+                    "arch": [
+                        "universal"
+                    ]
+                }
+            ],
+            "icon": "build/icon.png",
+            "category": "public.app-category.productivity",
+            "darkModeSupport": true
         },
         "portable": {
             "artifactName": "Teleprompter.exe"

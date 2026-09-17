@@ -53,6 +53,14 @@ function createWindow() {
         }
     });
 
+    // On macOS a plain always-on-top window drops behind full-screen apps and stays
+    // on the Space it was opened in. Float it above everything, on every Space, so it
+    // behaves like the Windows build: a see-through overlay over whatever you're recording.
+    if (process.platform === 'darwin') {
+        win.setAlwaysOnTop(true, 'floating');
+        win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    }
+
     win.loadFile('index.html');
 
     win.on('close', saveBounds);

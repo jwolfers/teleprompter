@@ -1,0 +1,84 @@
+# Builds the desktop apps and attaches them to a GitHub release.
+#
+# The homepage at tools.platypuseconomics.com links to
+#   https://github.com/jwolfers/teleprompter/releases/latest/download/Teleprompter.exe
+#   https://github.com/jwolfers/teleprompter/releases/latest/download/Teleprompter.dmg
+# so every tagged release must carry both files under exactly those names.
+#
+# To ship a version:  bump "version" in package.json, commit, then
+#   git tag v1.4.0 && git push origin v1.4.0
+# The Mac build has to happen on macOS (electron-builder can't make a .dmg on
+# Windows), which is why this runs here rather than on a laptop.
+#
+# "Run workflow" from the Actions tab does a dry run: it builds both apps and
+# leaves them as downloadable workflow artifacts without touching Releases.
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows
+            os: windows-latest
+            script: build:win
+            artifact: dist/Teleprompter.exe
+          - name: mac
+            os: macos-latest
+            script: build:mac
+            artifact: dist/Teleprompter.dmg
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # No Apple Developer certificate is configured, so electron-builder falls
+      # back to an ad-hoc signature on the universal Mac build. That's enough for
+      # the app to launch on Apple Silicon; Gatekeeper still asks the user to
+      # allow it once (System Settings -> Privacy & Security -> Open Anyway).
+      - run: npm run ${{ matrix.script }} -- --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Teleprompter-${{ matrix.name }}
+          path: ${{ matrix.artifact }}
+          if-no-files-found: error
+
+  release:
+    name: Attach to release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      # Creates the release for this tag if it doesn't exist yet, otherwise adds
+      # the files to it. Edit the notes on GitHub afterwards if you want more
+      # than the auto-generated commit list.
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: Teleprompter ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            artifacts/Teleprompter.exe
+            artifacts/Teleprompter.dmg

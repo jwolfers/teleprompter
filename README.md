@@ -68,21 +68,47 @@ npm install
 npm start
 ```
 
-On Windows, `Start Teleprompter.bat` does both of those for you, installing Node.js first if
-it isn't present.
+`Start Teleprompter.bat` (Windows) and `Start Teleprompter.command` (macOS) do both of those for
+you, installing Node.js first if it isn't present.
 
-**Prebuilt executable:** `Teleprompter.exe` in the repo root is a portable Windows build — copy
-it anywhere and run it, no install required. (It's gitignored; build your own with the commands
-below.)
+**Prebuilt desktop apps:** every release on GitHub carries two downloads, and the
+[Platypus Tools](https://tools.platypuseconomics.com) homepage links straight to the latest:
+
+- [`Teleprompter.exe`](https://github.com/jwolfers/teleprompter/releases/latest/download/Teleprompter.exe)
+  — portable Windows build. Copy it anywhere and run it, no install required.
+- [`Teleprompter.dmg`](https://github.com/jwolfers/teleprompter/releases/latest/download/Teleprompter.dmg)
+  — universal macOS build (Apple Silicon and Intel). Open the disk image and drag Teleprompter
+  into Applications.
+
+The Mac app is not notarized with Apple (that needs a paid developer account), so the first
+launch is blocked with "Apple could not verify…". Click **Done**, open **System Settings →
+Privacy & Security**, scroll down to the message about Teleprompter, and click **Open Anyway**.
+That's a one-time step. (On macOS 14 and earlier, right-click the app → **Open** does the same.)
 
 ## Building
 
 ```
 npm run build:win     # portable Teleprompter.exe -> dist/
-npm run build:mac     # Teleprompter.dmg -> dist/
+npm run build:mac     # universal Teleprompter.dmg -> dist/ (macOS only)
 npm run build         # both
-npm run icons         # regenerate icon PNGs from the SVG
+npm run icons         # regenerate icon PNGs, icon.ico and build/icon.png from the SVG
 ```
+
+A `.dmg` can only be built on a Mac, so releases are built by GitHub Actions
+(`.github/workflows/release.yml`) rather than locally. To ship a version, bump `version` in
+`package.json`, commit, and push a tag:
+
+```
+git tag v1.4.0
+git push origin v1.4.0
+```
+
+The workflow builds the Windows and Mac apps on their own runners and attaches both to a
+GitHub release for that tag, which is what the `releases/latest/download/…` links above resolve
+to. "Run workflow" from the Actions tab builds both without publishing, as a dry run.
+
+On macOS the window also floats above full-screen apps and follows you across Spaces, so the
+see-through overlay behaves the same as on Windows.
 
 ## Google Docs notes
 
@@ -116,7 +142,9 @@ Teleprompter/
 ├── main.js             # Electron main process (frameless, always-on-top window)
 ├── manifest.json       # PWA manifest
 ├── package.json        # Scripts and electron-builder config
-├── Start Teleprompter.bat   # Windows launcher (installs Node if needed)
+├── Start Teleprompter.bat       # Windows launcher (installs Node if needed)
+├── Start Teleprompter.command   # macOS launcher (same idea)
+├── .github/workflows/release.yml   # Builds the .exe and .dmg and attaches them to a release
 ├── tools/              # Icon generation
 └── icon*.png, *.ico, favicon.svg
 ```

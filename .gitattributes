@@ -1,0 +1,2 @@
+# Shell scripts must keep LF endings or macOS refuses to run them
+*.command text eol=lf

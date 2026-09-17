@@ -1,4 +1,5 @@
-// Rasterizes favicon.svg into PNG icons + a multi-resolution Windows .ico.
+// Rasterizes favicon.svg into PNG icons, a multi-resolution Windows .ico, and the 1024px PNG
+// electron-builder converts into the macOS .icns.
 // Run with the bundled Electron:  node_modules/.bin/electron tools/make-icons.js
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');

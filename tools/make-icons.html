@@ -9,6 +9,7 @@ const { ipcRenderer } = require('electron');
 const root = path.join(__dirname, '..');
 const PNG_SIZES = [16, 24, 32, 48, 64, 128, 192, 256, 512];
 const ICO_SIZES = [16, 24, 32, 48, 64, 128, 256];
+const MAC_SIZE = 1024; // electron-builder turns build/icon.png into the .icns for the Mac app
 
 function rasterize(svg, size) {
     return new Promise((resolve, reject) => {
@@ -64,7 +65,8 @@ function buildIco(entries) {
         fs.writeFileSync(path.join(root, 'icon.ico'), ico);
         fs.mkdirSync(path.join(root, 'build'), { recursive: true });
         fs.writeFileSync(path.join(root, 'build', 'icon.ico'), ico);
-        ipcRenderer.send('icons-done', `${PNG_SIZES.length} PNGs + icon.ico (${ICO_SIZES.length} sizes)`);
+        fs.writeFileSync(path.join(root, 'build', 'icon.png'), await rasterize(svg, MAC_SIZE));
+        ipcRenderer.send('icons-done', `${PNG_SIZES.length} PNGs + icon.ico (${ICO_SIZES.length} sizes) + build/icon.png (${MAC_SIZE}px)`);
     } catch (err) {
         ipcRenderer.send('icons-error', err && err.stack ? err.stack : String(err));
     }
