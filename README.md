@@ -22,6 +22,8 @@ Runs as a desktop app (Windows/macOS), or straight from `index.html` in a browse
 - Speed set in **words per minute**, converted to a scroll rate from how densely the current
   script lays out on screen — so font size, spacing and width changes hold the same pace.
 - A blue **guide line** marks the line to read; text above it dims as already-read.
+- **Find in script** (the magnifying glass, or <kbd>Ctrl</kbd>+<kbd>F</kbd>) jumps to any spot: matches are
+  highlighted in place and the nearest one is brought up to the guide line.
 - Bottom bar shows elapsed time, time remaining, and the **clock time you'll finish** at the
   current speed. Handy for hitting an exact slot: nudge the speed until the finish time matches.
 - 3-2-1 countdown on play. Mouse wheel or touch-drag scrubs anywhere in the script.
@@ -33,7 +35,11 @@ Runs as a desktop app (Windows/macOS), or straight from `index.html` in a browse
 
 ### Display
 - Font, size, line spacing, column width, and text/background colours, with a ☀️/🌙 button to
-  swap between dark and light schemes. Settings are remembered between sessions.
+  swap between dark and light schemes.
+- Speed has a slider in the bottom bar beside opacity as well as in the side panel; both drive the
+  same setting.
+- Every setting is remembered between sessions, and the desktop app reopens at the size and position
+  you left it — saved as the window settles rather than only on exit, so a force-quit doesn't lose it.
 - **Mirror** flips the text horizontally for beam-splitter rigs.
 - **Fullscreen** hides everything but the script.
 - In the desktop app the window is frameless, always-on-top, and has an **opacity** slider so it
@@ -45,8 +51,11 @@ Runs as a desktop app (Windows/macOS), or straight from `index.html` in a browse
 |-----|--------|
 | <kbd>Space</kbd> | Play / pause |
 | <kbd>↑</kbd> <kbd>↓</kbd> | Speed up / slow down |
-| <kbd>←</kbd> <kbd>→</kbd> | Jump back / forward |
+| <kbd>←</kbd> <kbd>→</kbd> | Scroll back / forward |
+| <kbd>PgUp</kbd> <kbd>PgDn</kbd> | Page up / down |
 | <kbd>,</kbd> <kbd>.</kbd> | Nudge back / forward one line |
+| <kbd>Home</kbd> <kbd>End</kbd> | Top / bottom of the script |
+| <kbd>Ctrl</kbd>+<kbd>F</kbd> | Find in script |
 | <kbd>[</kbd> <kbd>]</kbd> | Window opacity down / up |
 | <kbd>F</kbd> | Fullscreen |
 | <kbd>M</kbd> | Mirror |

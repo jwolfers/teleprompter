@@ -10,7 +10,8 @@ function loadBounds() {
     // screen module is only usable after app ready, so require it here
     const { screen } = require('electron');
     try {
-        const bounds = JSON.parse(fs.readFileSync(boundsFile(), 'utf8'));
+        const saved = JSON.parse(fs.readFileSync(boundsFile(), 'utf8'));
+        const bounds = saved.bounds || saved;   // older files stored bounds bare
         // Only restore if the window still overlaps a connected display
         const visible = screen.getAllDisplays().some(d =>
             bounds.x < d.bounds.x + d.bounds.width &&
@@ -18,7 +19,7 @@ function loadBounds() {
             bounds.y < d.bounds.y + d.bounds.height &&
             bounds.y + bounds.height > d.bounds.y
         );
-        if (visible) return bounds;
+        if (visible) return { bounds, maximized: !!saved.maximized };
     } catch (e) {
         // No saved bounds yet, or file unreadable — use defaults
     }
@@ -26,16 +27,30 @@ function loadBounds() {
 }
 
 function saveBounds() {
-    if (!win) return;
+    if (!win || win.isDestroyed()) return;
     try {
-        fs.writeFileSync(boundsFile(), JSON.stringify(win.getBounds()));
+        // getNormalBounds is the un-maximized size, so restoring from maximized
+        // gives back the window you had rather than a full-screen-sized one
+        fs.writeFileSync(boundsFile(), JSON.stringify({
+            bounds: win.getNormalBounds(),
+            maximized: win.isMaximized(),
+        }));
     } catch (e) {
         // Non-fatal — window position just won't be remembered
     }
 }
 
+// Saving only on close loses the layout whenever the app is force-quit or
+// crashes, which is how it usually goes. Save as the window settles instead.
+let saveBoundsTimer = null;
+function saveBoundsSoon() {
+    clearTimeout(saveBoundsTimer);
+    saveBoundsTimer = setTimeout(saveBounds, 400);
+}
+
 function createWindow() {
-    const bounds = loadBounds();
+    const saved = loadBounds();
+    const bounds = saved ? saved.bounds : null;
     win = new BrowserWindow({
         width: bounds ? bounds.width : 1200,
         height: bounds ? bounds.height : 800,
@@ -63,9 +78,16 @@ function createWindow() {
 
     win.loadFile('index.html');
 
+    if (saved && saved.maximized) win.maximize();
+
+    win.on('resize', saveBoundsSoon);
+    win.on('move', saveBoundsSoon);
+    win.on('maximize', saveBoundsSoon);
+    win.on('unmaximize', saveBoundsSoon);
     win.on('close', saveBounds);
 
     win.on('closed', () => {
+        clearTimeout(saveBoundsTimer);
         win = null;
     });
 }

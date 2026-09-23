@@ -21,16 +21,28 @@
             <div id="prompter-content" contenteditable="true" spellcheck="false">
                 <p>Paste your script here...</p>
             </div>
+            <!-- Find bar: jump to a spot in the script -->
+            <div id="find-bar" class="hidden">
+                <input type="text" id="find-input" placeholder="Find in script" spellcheck="false">
+                <span id="find-count"></span>
+                <button id="btn-find-prev" title="Previous match (Shift+Enter)">&uarr;</button>
+                <button id="btn-find-next" title="Next match (Enter)">&darr;</button>
+                <button id="btn-find-close" title="Close (Esc)">&#x2715;</button>
+            </div>
+
             <div id="countdown-overlay" class="hidden"></div>
             <div id="keyboard-hints" class="hidden">
                 <h3>Keyboard Shortcuts</h3>
                 <div class="hint-row"><span class="hint-key"><kbd>Space</kbd></span> <span>Play / Pause</span></div>
                 <div class="hint-row"><span class="hint-key"><kbd>&uarr;</kbd> <kbd>&darr;</kbd></span> <span>Speed +/-</span></div>
-                <div class="hint-row"><span class="hint-key"><kbd>&larr;</kbd> <kbd>&rarr;</kbd></span> <span>Jump back / forward</span></div>
+                <div class="hint-row"><span class="hint-key"><kbd>&larr;</kbd> <kbd>&rarr;</kbd></span> <span>Scroll back / forward</span></div>
+                <div class="hint-row"><span class="hint-key"><kbd>PgUp</kbd> <kbd>PgDn</kbd></span> <span>Page up / down</span></div>
+                <div class="hint-row"><span class="hint-key"><kbd>,</kbd> <kbd>.</kbd></span> <span>Nudge back/forward one line</span></div>
+                <div class="hint-row"><span class="hint-key"><kbd>Home</kbd> <kbd>End</kbd></span> <span>Top / bottom of script</span></div>
+                <div class="hint-row"><span class="hint-key"><kbd>Ctrl</kbd>+<kbd>F</kbd></span> <span>Find in script</span></div>
                 <div class="hint-row"><span class="hint-key"><kbd>F</kbd></span> <span>Fullscreen</span></div>
                 <div class="hint-row"><span class="hint-key"><kbd>M</kbd></span> <span>Mirror</span></div>
                 <div class="hint-row"><span class="hint-key"><kbd>R</kbd></span> <span>Reset</span></div>
-                <div class="hint-row"><span class="hint-key"><kbd>,</kbd> <kbd>.</kbd></span> <span>Nudge back/forward one line</span></div>
                 <div class="hint-row"><span class="hint-key"><kbd>[</kbd> <kbd>]</kbd></span> <span>Opacity -/+</span></div>
                 <div class="hint-row"><span class="hint-key"><kbd>?</kbd></span> <span>Toggle this help</span></div>
             </div>
@@ -110,13 +122,22 @@
         </div>
     </div>
 
-    <!-- Bottom bar: transport on the left, opacity underneath the app on the right -->
+    <!-- Bottom bar: transport on the left, speed and opacity on the right -->
     <div id="bottom-bar">
         <button id="btn-play-pause" class="transport-btn">&#9654; Play</button>
         <button id="btn-reset" class="transport-btn">&#8634; Reset</button>
+        <button id="btn-find" class="transport-btn" title="Find a spot in the script (Ctrl+F)" aria-label="Find in script">
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+                <circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.7"></circle>
+                <line x1="10.4" y1="10.4" x2="14" y2="14" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></line>
+            </svg>
+        </button>
         <span id="timer-display"></span>
         <span class="bottom-spacer"></span>
-        <label for="ctrl-opacity" id="opacity-label">Opacity</label>
+        <label for="ctrl-speed-bar" class="bar-label">Speed</label>
+        <input type="range" id="ctrl-speed-bar" min="50" max="300" value="150">
+        <span id="speed-bar-val">150 wpm</span>
+        <label for="ctrl-opacity" class="bar-label" id="opacity-label">Opacity</label>
         <input type="range" id="ctrl-opacity" min="10" max="100" value="100">
         <span id="opacity-val">100%</span>
     </div>
@@ -218,9 +239,18 @@
                     bottom of the prompter.
                 </p>
 
+                <h3>Finding a spot</h3>
+                <p>
+                    Click the magnifying glass in the bottom bar (or press <kbd>Ctrl</kbd>+<kbd>F</kbd>) and type.
+                    Every match lights up, the nearest one below the guide line is brought up to it, and
+                    <kbd>Enter</kbd> / <kbd>Shift</kbd>+<kbd>Enter</kbd> step through the rest. Handy for picking
+                    up from a particular line in rehearsal. <kbd>Esc</kbd> closes the box.
+                </p>
+
                 <h3>Display settings</h3>
                 <p>
-                    The side panel sets your reading speed in words per minute, and (under
+                    Reading speed has a slider in the bottom bar next to opacity, and another in the side panel &mdash;
+                    they are the same setting, so either one moves both. The side panel also holds (under
                     <em>Display settings</em>) font, text size, line spacing, column width, and
                     text/background colors. The ☀️/🌙 button swaps between dark and light color schemes.
                     <strong>Mirror</strong> flips the text horizontally for beam-splitter teleprompter rigs;
@@ -234,8 +264,11 @@
                 <table class="help-keys">
                     <tr><td><kbd>Space</kbd></td><td>Play / Pause</td></tr>
                     <tr><td><kbd>&uarr;</kbd> <kbd>&darr;</kbd></td><td>Speed up / slow down</td></tr>
-                    <tr><td><kbd>&larr;</kbd> <kbd>&rarr;</kbd></td><td>Jump back / forward</td></tr>
+                    <tr><td><kbd>&larr;</kbd> <kbd>&rarr;</kbd></td><td>Scroll back / forward</td></tr>
+                    <tr><td><kbd>PgUp</kbd> <kbd>PgDn</kbd></td><td>Page up / down</td></tr>
                     <tr><td><kbd>,</kbd> <kbd>.</kbd></td><td>Nudge back / forward one line</td></tr>
+                    <tr><td><kbd>Home</kbd> <kbd>End</kbd></td><td>Jump to the top / bottom of the script</td></tr>
+                    <tr><td><kbd>Ctrl</kbd>+<kbd>F</kbd></td><td>Find in script</td></tr>
                     <tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>Window opacity down / up</td></tr>
                     <tr><td><kbd>F</kbd></td><td>Fullscreen</td></tr>
                     <tr><td><kbd>M</kbd></td><td>Mirror</td></tr>
@@ -255,9 +288,11 @@
                     to unlink and import again.</p>
 
                 <p class="faq-q">Where are my script and settings stored?</p>
-                <p>Your display settings &mdash; font, size, spacing, width, colors, speed, opacity &mdash; are
-                    saved locally on your computer and come back when you reopen the app. The script itself
-                    is not kept: paste it again, or re-import the Google Doc. Nothing is ever uploaded.</p>
+                <p>Your display settings &mdash; font, size, spacing, width, colors, speed, opacity, mirror, and
+                    the side panel's width &mdash; are saved locally on your computer, along with the desktop
+                    window's size and position. Everything comes back exactly as you left it, even if the app
+                    is force-quit rather than closed. The script itself is not kept: paste it again, or
+                    re-import the Google Doc. Nothing is ever uploaded.</p>
 
                 <p class="faq-q">Does the elapsed timer stop when I pause?</p>
                 <p>No &mdash; it shows wall-clock time since you first pressed Play, including pauses, which

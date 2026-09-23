@@ -45,6 +45,7 @@ const ctrlLineHeight = $('#ctrl-line-height');
 const ctrlTextColor = $('#ctrl-text-color');
 const ctrlBgColor = $('#ctrl-bg-color');
 const ctrlSpeed = $('#ctrl-speed');
+const ctrlSpeedBar = $('#ctrl-speed-bar');   // same setting, down in the bottom bar
 const ctrlOpacity = $('#ctrl-opacity');
 
 // Buttons
@@ -59,6 +60,7 @@ const fontSizeVal = $('#font-size-val');
 const widthVal = $('#width-val');
 const lineHeightVal = $('#line-height-val');
 const speedVal = $('#speed-val');
+const speedBarVal = $('#speed-bar-val');
 const opacityVal = $('#opacity-val');
 
 // Other UI elements
@@ -90,6 +92,7 @@ function hasScript() {
 // Load clean HTML into the prompter (adds riff/stage-direction/paragraph markup)
 function setScript(html, { keepScroll = false } = {}) {
     state.editedScript = html;
+    if (typeof clearFind === 'function') clearFind();   // old match ranges are stale now
     prompterContent.innerHTML = processContentForDisplay(html);
     state.paragraphs = parseParagraphs();
     updateWordCount();
@@ -343,6 +346,10 @@ function applySettings() {
     speedVal.textContent = ctrlSpeed.value + ' wpm';
     opacityVal.textContent = ctrlOpacity.value + '%';
 
+    // The bottom bar carries the same speed setting as the side panel
+    ctrlSpeedBar.value = ctrlSpeed.value;
+    speedBarVal.textContent = ctrlSpeed.value + ' wpm';
+
     updateDayNightUI();
     saveSettings();
 }
@@ -396,6 +403,12 @@ function loadSettings() {
 ctrlFont.addEventListener('change', applySettings);
 [ctrlFontSize, ctrlWidth, ctrlLineHeight, ctrlSpeed, ctrlOpacity].forEach(ctrl => {
     ctrl.addEventListener('input', applySettings);
+});
+
+// The bottom bar's speed slider feeds the side panel's, which stays the source
+ctrlSpeedBar.addEventListener('input', () => {
+    ctrlSpeed.value = ctrlSpeedBar.value;
+    applySettings();
 });
 ctrlTextColor.addEventListener('input', applySettings);
 ctrlBgColor.addEventListener('input', applySettings);
@@ -1103,12 +1116,40 @@ function restoreScrollAnchor(anchor) {
     }
     if (newY === null) return; // anchor text was edited away — keep pixel position
 
+    scrollToContentY(newY);
+}
+
+// The furthest the script can be scrolled
+function maxScrollPosition() {
+    return prompterContainer.offsetHeight * 0.7 + prompterContent.scrollHeight;
+}
+
+// Bring a point in the content up to the reading guide line
+function scrollToContentY(y) {
     const containerHeight = prompterContainer.offsetHeight;
     const startPosition = containerHeight * 0.7;
     const eyeline = containerHeight * EYELINE_FRACTION;
-    const maxScroll = startPosition + prompterContent.scrollHeight;
+    const maxScroll = maxScrollPosition();
     state.scrollPosition = Math.min(maxScroll,
-        Math.max(0, startPosition - eyeline + newY));
+        Math.max(0, startPosition - eyeline + y));
+    positionContent();
+    updateProgress(state.scrollPosition, maxScroll);
+}
+
+// One line of the script at the current font size and spacing
+function lineHeightPx() {
+    return parseInt(ctrlFontSize.value) * (parseInt(ctrlLineHeight.value) / 100);
+}
+
+// A page keeps a couple of lines of overlap, so nothing is skipped over
+function pageScrollStep() {
+    return Math.max(lineHeightPx(), prompterContainer.offsetHeight - 2 * lineHeightPx());
+}
+
+// Move the script by a number of pixels, staying within the script
+function scrollByPixels(delta) {
+    const maxScroll = maxScrollPosition();
+    state.scrollPosition = Math.min(maxScroll, Math.max(0, state.scrollPosition + delta));
     positionContent();
     updateProgress(state.scrollPosition, maxScroll);
 }
@@ -1424,6 +1465,159 @@ $('#gdoc-linked-badge').addEventListener('contextmenu', (e) => {
 });
 
 
+// ===== FIND IN SCRIPT =====
+// Matches are highlighted with the CSS Custom Highlight API, which paints over
+// the text without touching the DOM — so finding can't disturb the script, the
+// editor's caret, or the sentence anchoring a Google Doc sync relies on.
+
+const findBar = $('#find-bar');
+const findInput = $('#find-input');
+const findCount = $('#find-count');
+const HAS_HIGHLIGHT_API = typeof Highlight === 'function' && typeof CSS !== 'undefined' && CSS.highlights;
+
+let findMatches = [];    // Ranges, in document order
+let findIndex = -1;
+
+// Every text node in the script, plus the concatenated text, so a match can be
+// mapped back to the node(s) it spans
+function collectScriptText() {
+    const nodes = [];
+    let text = '';
+    const walker = document.createTreeWalker(prompterContent, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+        nodes.push({ node: walker.currentNode, start: text.length });
+        text += walker.currentNode.textContent;
+    }
+    return { nodes, text };
+}
+
+// The text node holding a given offset (binary search — scripts get long)
+function nodeAtOffset(nodes, offset) {
+    let lo = 0;
+    let hi = nodes.length - 1;
+    while (lo < hi) {
+        const mid = (lo + hi + 1) >> 1;
+        if (nodes[mid].start <= offset) lo = mid; else hi = mid - 1;
+    }
+    return nodes[lo];
+}
+
+function rangeForMatch(nodes, start, end) {
+    const from = nodeAtOffset(nodes, start);
+    const to = nodeAtOffset(nodes, end - 1);
+    const range = document.createRange();
+    range.setStart(from.node, start - from.start);
+    range.setEnd(to.node, Math.min(to.node.textContent.length, end - to.start));
+    return range;
+}
+
+function paintFindHighlights() {
+    if (!HAS_HIGHLIGHT_API) return;
+    CSS.highlights.delete('find');
+    CSS.highlights.delete('find-current');
+    if (!findMatches.length) return;
+    CSS.highlights.set('find', new Highlight(...findMatches));
+    if (findIndex >= 0) {
+        const current = new Highlight(findMatches[findIndex]);
+        current.priority = 1;   // sits on top of the dimmer all-matches highlight
+        CSS.highlights.set('find-current', current);
+    }
+}
+
+function clearFind() {
+    findMatches = [];
+    findIndex = -1;
+    findCount.textContent = '';
+    if (HAS_HIGHLIGHT_API) {
+        CSS.highlights.delete('find');
+        CSS.highlights.delete('find-current');
+    }
+}
+
+// Find every occurrence, then go to the one nearest the current reading position
+function runFind(query) {
+    clearFind();
+    if (!query) return;
+
+    const { nodes, text } = collectScriptText();
+    if (!nodes.length) {
+        findCount.textContent = 'no matches';
+        return;
+    }
+
+    const haystack = text.toLowerCase();
+    const needle = query.toLowerCase();
+    for (let at = haystack.indexOf(needle); at !== -1; at = haystack.indexOf(needle, at + needle.length)) {
+        findMatches.push(rangeForMatch(nodes, at, at + needle.length));
+    }
+
+    if (!findMatches.length) {
+        findCount.textContent = 'no matches';
+        paintFindHighlights();
+        return;
+    }
+
+    // Start from whatever is on screen rather than jumping back to the top
+    const eyeline = prompterContainer.getBoundingClientRect().top +
+        prompterContainer.offsetHeight * EYELINE_FRACTION;
+    findIndex = findMatches.findIndex(r => r.getBoundingClientRect().top >= eyeline);
+    goToMatch(findIndex === -1 ? 0 : findIndex);
+}
+
+function goToMatch(index) {
+    if (!findMatches.length) return;
+    findIndex = (index + findMatches.length) % findMatches.length;
+    const rect = findMatches[findIndex].getBoundingClientRect();
+    scrollToContentY(rect.top - prompterContent.getBoundingClientRect().top);
+    findCount.textContent = `${findIndex + 1} of ${findMatches.length}`;
+    paintFindHighlights();
+}
+
+function stepFind(delta) {
+    if (!findMatches.length) {
+        runFind(findInput.value.trim());
+        return;
+    }
+    goToMatch(findIndex + delta);
+}
+
+function openFind() {
+    findBar.classList.remove('hidden');
+    $('#btn-find').classList.add('active');
+    findInput.focus();
+    findInput.select();
+    if (findInput.value.trim()) runFind(findInput.value.trim());
+}
+
+function closeFind() {
+    // Hand focus back before hiding: a focused-but-hidden input still counts as
+    // the active element, and the shortcut handler skips everything while an
+    // input has focus — which would leave Space, the arrows and the rest dead
+    findInput.blur();
+    findBar.classList.add('hidden');
+    $('#btn-find').classList.remove('active');
+    clearFind();
+}
+
+$('#btn-find').addEventListener('click', () => {
+    if (findBar.classList.contains('hidden')) openFind(); else closeFind();
+});
+$('#btn-find-next').addEventListener('click', () => stepFind(1));
+$('#btn-find-prev').addEventListener('click', () => stepFind(-1));
+$('#btn-find-close').addEventListener('click', closeFind);
+
+findInput.addEventListener('input', () => runFind(findInput.value.trim()));
+findInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        stepFind(e.shiftKey ? -1 : 1);
+    } else if (e.key === 'Escape') {
+        e.preventDefault();
+        closeFind();
+    }
+});
+
+
 // ===== MOUSE & TOUCH CONTROLS =====
 
 // Mouse wheel scrubs through the script
@@ -1490,6 +1684,13 @@ initRemoteControl();
 // ===== KEYBOARD SHORTCUTS =====
 
 document.addEventListener('keydown', (e) => {
+    // Find is reachable from anywhere, including mid-edit
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
+        e.preventDefault();
+        openFind();
+        return;
+    }
+
     // While typing in the script (paused, caret in text): only Esc, which
     // leaves editing so the shortcuts work again
     if (document.activeElement === prompterContent &&
@@ -1520,28 +1721,36 @@ document.addEventListener('keydown', (e) => {
             break;
         case 'ArrowLeft':
             e.preventDefault();
-            state.scrollPosition = Math.max(0, state.scrollPosition - 100);
-            positionContent();
+            scrollByPixels(-100);
             break;
         case 'ArrowRight':
             e.preventDefault();
-            state.scrollPosition += 100;
-            positionContent();
+            scrollByPixels(100);
             break;
-        case '.': {
+        case 'PageUp':
+            e.preventDefault();
+            scrollByPixels(-pageScrollStep());
+            break;
+        case 'PageDown':
+            e.preventDefault();
+            scrollByPixels(pageScrollStep());
+            break;
+        case 'Home':
+            e.preventDefault();
+            scrollByPixels(-maxScrollPosition());
+            break;
+        case 'End':
+            e.preventDefault();
+            scrollByPixels(maxScrollPosition());
+            break;
+        case '.':
             // Nudge forward one line
-            const lineH = parseInt(ctrlFontSize.value) * (parseInt(ctrlLineHeight.value) / 100);
-            state.scrollPosition += lineH;
-            positionContent();
+            scrollByPixels(lineHeightPx());
             break;
-        }
-        case ',': {
+        case ',':
             // Nudge back one line
-            const lineH = parseInt(ctrlFontSize.value) * (parseInt(ctrlLineHeight.value) / 100);
-            state.scrollPosition = Math.max(0, state.scrollPosition - lineH);
-            positionContent();
+            scrollByPixels(-lineHeightPx());
             break;
-        }
         case 'f':
             if (!e.ctrlKey && !e.metaKey) toggleFullscreen();
             break;
@@ -1713,5 +1922,5 @@ maybeShowWelcome();
 requestAnimationFrame(positionContent);
 
 // Version stamp
-const VERSION_TIMESTAMP = '2026-09-09 v13 — tab preview on hover';
+const VERSION_TIMESTAMP = '2026-09-23 v14 — find in script, more shortcuts, remembers its window';
 document.getElementById('version-stamp').textContent = VERSION_TIMESTAMP;

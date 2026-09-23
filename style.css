@@ -207,6 +207,62 @@ body.light-bg #prompter-container::before {
     );
 }
 
+/* ===== FIND IN SCRIPT ===== */
+#find-bar {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    background: rgba(26, 26, 46, 0.96);
+    border: 1px solid #4a4a70;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+#find-input {
+    width: 190px;
+    padding: 6px 10px;
+    background: #222;
+    border: 1px solid #444;
+    border-radius: 5px;
+    color: #ddd;
+    font-size: 13px;
+}
+
+#find-input:focus {
+    outline: none;
+    border-color: #4a6fa5;
+}
+
+#find-count {
+    min-width: 62px;
+    font-size: 11px;
+    color: #888;
+    font-family: monospace;
+    text-align: center;
+    white-space: nowrap;
+}
+
+#find-bar button {
+    padding: 4px 9px;
+    font-size: 12px;
+    line-height: 1.2;
+}
+
+/* Matches are painted over the text, leaving the DOM untouched */
+::highlight(find) {
+    background-color: rgba(240, 192, 64, 0.28);
+}
+
+::highlight(find-current) {
+    background-color: #f0c040;
+    color: #000;
+}
+
 /* Reading guide line */
 #prompter-container::after {
     content: '';
@@ -526,12 +582,42 @@ body.is-electron #btn-help {
     flex: 1;
 }
 
-#opacity-label {
+.bar-label {
     font-size: 11px;
     color: #888;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     white-space: nowrap;
+}
+
+/* Speed sits to the left of opacity, with a little air between the pairs */
+#ctrl-speed-bar + #speed-bar-val {
+    margin-right: 10px;
+}
+
+#speed-bar-val {
+    font-size: 11px;
+    color: #ddd;
+    font-family: monospace;
+    min-width: 58px;
+}
+
+#btn-find {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 12px;
+}
+
+#btn-find svg {
+    width: 15px;
+    height: 15px;
+    display: block;
+}
+
+#btn-find.active {
+    background: #4a6fa5;
+    border-color: #4a6fa5;
+    color: #fff;
 }
 
 #bottom-bar input[type="range"] {
